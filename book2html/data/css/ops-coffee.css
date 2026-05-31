@@ -324,7 +324,17 @@ aside#sidebar a.button {
 }
 
 /* ---------- 4. 内容区：nav-list / nav-item ---------- */
-.nav-cell { margin-bottom: 20px; }
+.nav-cell {
+  margin-bottom: 20px;
+  contain-intrinsic-size: auto 560px;
+}
+body.site-page[data-text-contrast="off"]:not([data-surface="liquid"]) .nav-cell {
+  content-visibility: auto;
+}
+body.site-page:not([data-text-contrast="off"]) .nav-cell,
+body.site-page[data-surface="liquid"] .nav-cell {
+  content-visibility: visible;
+}
 .nav-cell h2 {
   font-size: 16px;
   color: #3b2c28;
@@ -335,6 +345,7 @@ aside#sidebar a.button {
 
 .nav-list,
 .nav-list-art {
+  --nav-card-min-width: 240px;
   margin-left: -10px;
   margin-right: -10px;
   list-style: none;
@@ -342,7 +353,7 @@ aside#sidebar a.button {
 }
 .nav-list {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--nav-card-min-width)), 1fr));
 }
 .nav-list li {
   box-sizing: border-box;
@@ -1925,7 +1936,6 @@ body.site-page[data-density="compact"] .nav-item.has-description .nav-img {
   .container { width: 730px; }
   #main-content { width: 490px; }
   aside#sidebar { width: 230px; }
-  .nav-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 @media only screen and (max-width: 768px) {
@@ -1974,7 +1984,7 @@ body.site-page[data-density="compact"] .nav-item.has-description .nav-img {
     margin-top: 10px;
     margin-bottom: 0;
   }
-  .nav-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .nav-list { --nav-card-min-width: 260px; }
   .nav-list-art li { width: 100%; }
 
   .site-preferences {
