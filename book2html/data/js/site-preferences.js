@@ -283,7 +283,10 @@
   let preferences = readPreferences();
   let textContrastRequest = 0;
   let textContrastFrame = 0;
+  let textContrastScrollTimer = 0;
+  let textContrastLastScrollUpdate = 0;
   let textContrastSamplerCache = { key: "", promise: null };
+  let textContrastColorCache = { key: "", promise: null };
   let colorResolverElement = null;
   const localTextContrastSelector = [
     ".nav-item[data-text-tone]",
@@ -520,6 +523,23 @@
     image.src = url;
   });
 
+  const getSampledBackgroundColor = (url) => {
+    if (textContrastColorCache.key === url && textContrastColorCache.promise) {
+      return textContrastColorCache.promise;
+    }
+
+    const promise = sampleImageColor(url).catch((error) => {
+      if (textContrastColorCache.key === url) {
+        textContrastColorCache = { key: "", promise: null };
+      }
+
+      throw error;
+    });
+
+    textContrastColorCache = { key: url, promise };
+    return promise;
+  };
+
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
   const clearLocalTextContrastTones = () => {
@@ -610,12 +630,20 @@
       return textContrastSamplerCache.promise;
     }
 
+    const promise = createImageSampler(url, styles).catch((error) => {
+      if (textContrastSamplerCache.key === key) {
+        textContrastSamplerCache = { key: "", promise: null };
+      }
+
+      throw error;
+    });
+
     textContrastSamplerCache = {
       key,
-      promise: createImageSampler(url, styles)
+      promise
     };
 
-    return textContrastSamplerCache.promise;
+    return promise;
   };
 
   const getVisibleRect = (element) => {
@@ -828,12 +856,17 @@
       return;
     }
 
-    sampleImageColor(backgroundUrl)
+    getSampledBackgroundColor(backgroundUrl)
       .then(useColor)
       .catch(() => useColor(fallbackColor));
   };
 
   const scheduleTextContrastTone = () => {
+    if (textContrastScrollTimer) {
+      window.clearTimeout(textContrastScrollTimer);
+      textContrastScrollTimer = 0;
+    }
+
     if (textContrastFrame) {
       window.cancelAnimationFrame(textContrastFrame);
     }
@@ -842,6 +875,29 @@
       textContrastFrame = 0;
       updateTextContrastTone();
     });
+  };
+
+  const scheduleTextContrastToneFromScroll = () => {
+    const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+    const elapsed = now - textContrastLastScrollUpdate;
+    const delay = Math.max(0, 120 - elapsed);
+
+    if (textContrastScrollTimer) {
+      window.clearTimeout(textContrastScrollTimer);
+      textContrastScrollTimer = 0;
+    }
+
+    if (delay === 0) {
+      textContrastLastScrollUpdate = now;
+      scheduleTextContrastTone();
+      return;
+    }
+
+    textContrastScrollTimer = window.setTimeout(() => {
+      textContrastScrollTimer = 0;
+      textContrastLastScrollUpdate = typeof performance !== "undefined" ? performance.now() : Date.now();
+      scheduleTextContrastTone();
+    }, delay);
   };
 
   const applyPreferences = () => {
@@ -1419,7 +1475,7 @@
     attributeFilter: ["hidden"]
   });
   window.addEventListener("resize", scheduleTextContrastTone);
-  window.addEventListener("scroll", scheduleTextContrastTone, { passive: true });
+  window.addEventListener("scroll", scheduleTextContrastToneFromScroll, { passive: true });
 
   applyPreferences();
   renderPreferencePanel();
