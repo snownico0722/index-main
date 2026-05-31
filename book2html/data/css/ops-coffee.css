@@ -1978,7 +1978,15 @@ body.site-page[data-density="compact"] .nav-item.has-description .nav-img {
   .header-menu > ul > li {
     float: none;
     display: inline-block;
-    margin: 0 10px;
+    margin: 0 6px 0 0;
+  }
+  .header-menu > ul > li a {
+    line-height: 40px;
+    padding: 0 4px;
+  }
+  .header-menu a {
+    font-size: 14px;
+    letter-spacing: 0;
   }
   #content-wrapper {
     margin-top: 10px;
@@ -1990,11 +1998,11 @@ body.site-page[data-density="compact"] .nav-item.has-description .nav-img {
   .site-preferences {
     float: none;
     justify-content: flex-end;
-    height: 44px;
+    height: 40px;
   }
   .preference-panel {
-    top: 40px;
-    width: min(320px, 88vw);
+    top: 36px;
+    width: min(300px, 88vw);
   }
 
   body.site-page[data-density="compact"] #content-wrapper {
