@@ -1992,7 +1992,10 @@ body.site-page[data-density="compact"] .nav-item.has-description .nav-img {
     margin-top: 10px;
     margin-bottom: 0;
   }
-  .nav-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .nav-list {
+    grid-template-columns: repeat(2, minmax(0, 260px));
+    justify-content: center;
+  }
   .nav-list-art li { width: 100%; }
 
   .site-preferences {
@@ -2016,8 +2019,8 @@ body.site-page[data-density="compact"] .nav-item.has-description .nav-img {
   }
 }
 
-@media (max-width: 520px) {
-  .nav-list { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 560px) {
+  .nav-list { grid-template-columns: minmax(0, 260px); }
 }
 
 
