@@ -1348,6 +1348,54 @@
     return [svg, label];
   };
 
+  const headerTightGapThreshold = 20;
+  let headerTightFrame = 0;
+
+  const scheduleHeaderTightState = (headerContainer) => {
+    if (headerTightFrame) {
+      window.cancelAnimationFrame(headerTightFrame);
+    }
+
+    headerTightFrame = window.requestAnimationFrame(() => {
+      headerTightFrame = 0;
+
+      const menu = headerContainer.querySelector(".header-menu");
+      const toggle = headerContainer.querySelector(".preference-toggle");
+
+      if (!menu || !toggle) {
+        document.body.classList.remove("is-header-tight");
+        return;
+      }
+
+      const lastItem = menu.querySelector("ul > li:last-child");
+      const lastLink = lastItem?.querySelector("a");
+
+      if (!lastItem || !lastLink) {
+        document.body.classList.remove("is-header-tight");
+        return;
+      }
+
+      const wasTight = document.body.classList.contains("is-header-tight");
+
+      if (wasTight) {
+        document.body.classList.remove("is-header-tight");
+      }
+
+      const lastRect = lastLink.getBoundingClientRect();
+      const toggleRect = toggle.getBoundingClientRect();
+      const lastItemMarginRight = Number.parseFloat(window.getComputedStyle(lastItem).marginRight) || 0;
+
+      if (wasTight) {
+        document.body.classList.add("is-header-tight");
+      }
+
+      const gap = toggleRect.left - (lastRect.right + lastItemMarginRight);
+      const wrapped = toggleRect.top > lastRect.bottom - 2 || Math.abs(toggleRect.top - lastRect.top) > Math.max(8, lastRect.height * 0.5);
+
+      document.body.classList.toggle("is-header-tight", wrapped || gap < headerTightGapThreshold);
+    });
+  };
+
   const renderPreferencePanel = () => {
     const headerContainer = document.querySelector("[data-site-header] .container");
 
@@ -1463,6 +1511,44 @@
     headerContainer.append(root);
     document.body.append(backdrop, panel);
     updateControls(panel);
+
+    const updateHeaderTightState = () => scheduleHeaderTightState(headerContainer);
+    const headerObserver = new MutationObserver(updateHeaderTightState);
+    const headerLayoutObserver = new MutationObserver(updateHeaderTightState);
+
+    headerObserver.observe(headerContainer, {
+      childList: true,
+      subtree: true
+    });
+    headerLayoutObserver.observe(document.body, {
+      attributes: true,
+      attributeFilter: [
+        "data-theme",
+        "data-surface",
+        "data-density",
+        "data-theme-background-priority",
+        "data-background-blur",
+        "data-card-renderer",
+        "data-text-contrast",
+        "data-text-contrast-method",
+        "data-text-color-mode",
+        "data-text-brightness",
+        "data-text-shadow",
+        "data-text-bold",
+        "data-card-opacity-level",
+        "data-card-opacity-direction"
+      ]
+    });
+
+    window.addEventListener("resize", updateHeaderTightState);
+    window.addEventListener("orientationchange", updateHeaderTightState);
+    window.addEventListener("load", updateHeaderTightState, { once: true });
+
+    if (document.fonts?.ready) {
+      document.fonts.ready.then(updateHeaderTightState).catch(() => {});
+    }
+
+    updateHeaderTightState();
   };
 
   new MutationObserver(scheduleTextContrastTone).observe(document.body, {
