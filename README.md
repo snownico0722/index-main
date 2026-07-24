@@ -1,109 +1,95 @@
 # 个人导航
 
-一个纯静态的个人导航页，可以直接打开 `index.html` 使用，也可以放到任意静态托管服务上。
+打开浏览器，就是你自己的起始页。
 
-## 结构
+不用注册、不用服务器、不用装一堆依赖——双击 `index.html` 就能用。站点、搜索引擎、外观都在你自己手里，想怎么摆就怎么摆。
 
-- `index.html`、`common.html`、`develop.html`、`tools.html`：页面壳，负责页面元信息和挂载点。
-- `js/site-data.js`：所有导航分类、站点、链接和图标数据。
-- `js/site-shell.js`：渲染顶部导航。
-- `js/site-preferences.js`：渲染主题、质感、文字和密度偏好面板，并保存本地偏好。
-- `js/site-renderer.js`：根据 `js/site-data.js` 渲染站点卡片。
-- `js/nav.ops-coffee.min.js`：首页搜索框和搜索引擎切换逻辑。
-- `js/liquid-glass.js`：液态玻璃的真折射实现（仅 Chromium 系生效，其他浏览器自动回退）。
-- `js/background-loader.js`：异步加载背景图。
-- `css/ops-coffee.css`：基础样式、主题与质感定义。
-- `images/paper-texture.png`：磨砂纸质感的纸纹叠加层。
-- `book2html/`：本地网页界面的收藏夹导出工具，可复用本站资源生成同风格导航页，也可用 `data/` 资源独立运行。
-- `scripts/check-project.ps1`：项目自检脚本。
-- `scripts/export-chrome-bookmarks.ps1`：命令行版收藏夹导出工具。
-- `scripts/format-site-data.js`：一次性把 `site-data.js` 重排为标准 2 空格缩进的工具。
+![主题切换示意](screenshots/Styles.gif)
 
-## 修改导航
+## 它适合谁
 
-新增或调整站点时，优先编辑 `js/site-data.js`。每个站点对象包含：
+- 想把常用网站收成一页，而不是每次在书签栏里翻
+- 想换个顺眼的首页，又不想绑定某个在线导航服务
+- 想把 Chrome / Edge 里的收藏夹，直接变成同风格的静态页面
 
-```js
-{
-  "name": "站点名",
-  "url": "https://example.com/",
-  "icon": "images/example.png",
-  "description": "可选简介"
-}
+## 怎么开始
+
+1. 打开项目文件夹
+2. 双击 `index.html`（或用浏览器打开它）
+3. 右上角齿轮里改外观；导航内容在 `js/site-data.js` 里改
+
+日常使用就这一步。关掉浏览器再打开，设置还在——都记在本机里。
+
+## 你能改什么
+
+点右上角设置，大部分都能拖一拖、点一点：
+
+| 想调的 | 大概能做什么 |
+| --- | --- |
+| 浅色 / 深色 | 整体明暗 |
+| 质感 | 毛玻璃、液态玻璃、亚克力、云母、纸纹、黑曜石、霓虹、像素…… |
+| 密度 | 宽松或紧凑，屏幕小的时候紧凑更省地方 |
+| 壁纸相关 | 背景模糊、主题背景优先等 |
+| 卡片 | 明暗、透明度，文字和图标不会跟着糊掉 |
+| 文字 | 颜色、明暗、阴影、加粗，还有反色增强可读性 |
+
+默认是浅色 + 毛玻璃。不喜欢随时改，改完会自动记住。
+
+### 质感一览
+
+不必全记，逛一遍设置就知道自己喜欢哪个：
+
+- **毛玻璃** — 最稳妥的默认选择
+- **液态玻璃** — 更接近 iOS 那一类玻璃感（Chromium 浏览器效果最好）
+- **亚克力 / 云母** — 更厚的磨砂，或让壁纸色温透出来
+- **磨砂纸** — 铺一层真实纸纹
+- **黑曜石** — 深黑 + 冷亮边
+- **赛博霓虹 / 8-bit 像素** — 玩票向，换心情用
+
+## 首页搜索
+
+首页中间是搜索框。点左侧图标可以切换百度、Google、Bing 等引擎，回车或点搜索即可。
+
+## 想改上面有哪些网站？
+
+导航分组和链接都在：
+
+```text
+js/site-data.js
 ```
 
-`description` 为空时会渲染为更紧凑的卡片；有描述时会保留两行简介区域。
+用任意文本编辑器打开，按现有格式增删分类和站点即可。图标放在 `images/` 里，路径写对就能显示。
 
-## 导出 Chrome 收藏夹
+`common.html`、`develop.html`、`tools.html` 等是其他分页；顶栏会跟着数据一起生成。
 
-推荐使用 `book2html` 的本地网页界面：
+## 收藏夹一键变导航页
+
+不想一条条手抄书签的话，用自带的 **Book2HTML**：
+
+1. 进入 `book2html` 文件夹
+2. 在地址栏输入 `powershell` 回车（或在此文件夹打开终端）
+3. 运行：
 
 ```powershell
-cd book2html
 powershell -ExecutionPolicy Bypass -File .\book2html-server.ps1
 ```
 
-页面会自动扫描 Chromium 系浏览器的 `Bookmarks` 文件，右侧按层级浏览收藏夹，勾选一个收藏夹后生成根目录下的 `bookmarks_收藏夹名称.html`。
+浏览器会自动打开本地小工具。它会扫描本机 Chrome / Edge / Brave 等浏览器的收藏夹，你勾选需要的文件夹，就能生成同风格的 `bookmarks_xxx.html`，并可选写进顶栏导航。
 
-补充说明：
+更细的说明见 [book2html/README.md](book2html/README.md)。
 
-- 主项目仓库：<https://github.com/testsnow0722/index-main>
-- `Book2HTML` 独立仓库：<https://github.com/testsnow0722/Bookmarks-to-html>
-- 更完整的关系、依赖和运行说明见 [book2html/README.md](book2html/README.md)。
+## 使用小贴士
 
-也可以继续使用命令行版：
+- **纯本地**：页面和设置都在你电脑上，不会上传到任何服务器
+- **换电脑**：把整个文件夹拷过去就能用；若要带上外观偏好，浏览器里该站点的本地数据不会自动跟着走，到新环境再调一次设置即可
+- **壁纸**：默认用 `images/beijing.jpg`，换成自己的图并保持文件名，或改代码里的引用路径
+- **液态玻璃**：建议用 Chrome / Edge 等 Chromium 内核浏览器，效果更完整
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/export-chrome-bookmarks.ps1 -BookmarksPath "C:\Users\你的用户名\AppData\Local\Google\Chrome\User Data\Default\Bookmarks" -Folder "chrome://bookmarks/?id=123" -Open
-```
+## 相关链接
 
-## 外观偏好
+- 主项目：https://github.com/testsnow0722/index-main
+- Book2HTML：https://github.com/testsnow0722/Bookmarks-to-html
 
-顶部导航右侧的“偏好”面板支持本地设置：
+## 致谢
 
-- 主题：浅色 / 深色
-- 质感（10 种）：
-  - **毛玻璃**：标准 backdrop-filter blur + 高饱和。
-  - **液态玻璃**：用 SVG `feDisplacementMap` 做物理折射；hover 时被悬停的卡片折射变厚。仅 Chromium 系生效。
-  - **液态·兼容**：纯 CSS 实现的伪液态玻璃，全浏览器可用，作为液态玻璃的回退。
-  - **亚克力**：更厚的磨砂 + 内描边。
-  - **云母**：参考 Win11 Mica，高 blur + 厚底色，让壁纸色温微微透出。
-  - **磨砂纸**：全屏覆盖一层真实纸纹（PNG）。
-  - **黑曜石**：火山玻璃质感，深黑底 + 冷调亮边。
-  - **赛博霓虹**：黑底 + 粉色边框 + 多层 box-shadow 内外发光，hover 切换到青色。
-  - **8-bit 像素**：阶梯式 box-shadow 模拟像素方块边框 + monospace 字体；hover 时框变粗、文字加粗变黄。
-  - **简洁**：实心卡片，无任何模糊。
-- 密度：宽松 / 紧凑
-- 卡片明暗度：在 -100% 到 +100% 之间调整卡片底色明暗。
-- 文字主题色：色板或十六进制色值，可还原为每个配色自带文字色，并可在 -100% 到 +100% 之间调整文字明暗度。
-- 文字反色：关闭 / 标题 / 全部，可选择 CSS 差值混合或采样切换黑白。
-
-偏好会保存到浏览器的 `localStorage`，不会影响 `js/site-data.js` 里的导航数据。默认值是浅色毛玻璃。
-
-## 本地检查
-
-运行基础检查：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/check-project.ps1
-```
-
-这个检查会验证：
-
-- `js/site-data.js` 能被解析。
-- 每个页面都有数据。
-- 每个站点 URL 是合法的绝对 URL。
-- 每个图标文件都存在。
-- 是否还有 `http://` 链接。
-
-需要联网检查远程链接状态时运行：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/check-project.ps1 -CheckRemote
-```
-
-远程检查可能受网络、站点反爬、地区访问限制影响，所以远程失败会作为警告输出。
-
-## 第三方资源 / 许可
-
-- `images/paper-texture.png`：来自 [transparenttextures.com](https://www.transparenttextures.com/)，作者 Atle Mo，CC BY-SA 3.0。
+- 磨砂纸纹理 `images/paper-texture.png` 来自 [transparenttextures.com](https://www.transparenttextures.com/)，作者 Atle Mo，许可 CC BY-SA 3.0

@@ -1,66 +1,29 @@
 # Book2HTML
 
-本目录是 Chrome / Edge / Brave 收藏夹导出工具。
+把 Chromium 系浏览器的收藏夹导出成静态导航页的工具。
 
-## 和主项目的关系
+它只做一件事——读收藏夹，生成和主站风格一致的 `bookmarks_*.html`。纯 PowerShell，不依赖 Node、npm、Python 或数据库，也不联网。
 
-`Book2HTML` 最初是主项目 `index-main` 里的一个配套工具，用来把 Chromium 系浏览器收藏夹导出成和主站风格一致的静态导航页。
+## 特点
 
-- 放在主项目 `book2html/` 目录下运行时，会优先复用父目录的 `css/`、`js/`、`images/` 资源。
-- 这种模式下，生成的 `bookmarks_*.html` 默认输出到主项目根目录，并可把跳转入口写回现有页面导航。
-- 如果父目录没有完整站点资源，程序会退回到当前目录或 `data/` 里的极简资源独立运行。
+- **零依赖**。只要 Windows PowerShell 5.1 或 7+ 和一个浏览器，本地起一个 `127.0.0.1` 的网页界面操作，不暴露到局域网。
+- **复用主站资源**。放在主项目 `book2html/` 下运行时，优先复用父目录的 `css/`、`js/`、`images/`，生成页输出到主项目根目录，可写回现有页面导航。
+- **可独立运行**。父目录没有站点资源时，退回到 `data/` 里的极简资源单独运行，代价是生成页只走极简样式，并标红提示「极简模式」。
+- **多收藏夹合并**。可选多个收藏夹组合成同一个页面，左侧已选列表拖动排序决定输出顺序。
 
-换句话说，`Book2HTML` 既可以作为主项目的内置导出器使用，也可以作为单独仓库独立运行。
+## 支持的浏览器
 
-## 依赖
+自动扫描 Chrome、Chrome Beta、Edge、Brave、Chromium 的 `Bookmarks` 文件。
 
-- Windows PowerShell 5.1 或 PowerShell 7+
-- 本机浏览器，用于打开 `http://127.0.0.1:8765/` 本地界面
-- Chromium 系浏览器收藏夹文件 `Bookmarks`，当前自动扫描：
-  - Chrome
-  - Chrome Beta
-  - Edge
-  - Brave
-  - Chromium
-
-不依赖 Node.js、npm、Python 或数据库，也不需要联网。
-
-独立运行时，至少需要以下文件存在：
-
-- `book2html-server.ps1`
-- `data/css/`
-- `data/js/`
-- `data/images/`
-
-如果要和主项目联动，则父目录还需要有主站自己的 `css/`、`js/`、`images/`。
-
-## 仓库链接
-
-- 主项目 `index-main`：<https://github.com/testsnow0722/index-main>
-- `Book2HTML` 独立仓库：<https://github.com/testsnow0722/Bookmarks-to-html>
-
-启动本地网页界面：
+## 启动
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\book2html-server.ps1
 ```
 
-默认行为：
+默认监听 `127.0.0.1:8765` 并自动打开浏览器。右侧按层级浏览收藏夹，勾选后自定义顶栏名生成页面；顶栏名同时作为页面标题、导航标签和文件名基准。目标文件已存在时可选覆盖或自动加序号，也可把生成页跳转写入其他页面、或清理已删除生成页的跳转。
 
-- 只监听 `127.0.0.1`，不会暴露到局域网。
-- 自动打开 `http://127.0.0.1:8765/`。
-- 自动扫描 Chromium 系浏览器的 `Bookmarks` 文件。
-- 右侧收藏夹列表按层级浏览，默认打开书签栏；可通过面包屑返回根目录。
-- 可以选择一个或多个收藏夹组合生成同一个页面。
-- 左侧已选收藏夹列表可拖动调整上下顺序，生成页面会按这个顺序输出。
-- 可自定义顶栏名；顶栏名会同步作为页面标题、导航标签和 `bookmarks_顶栏名.html` 的文件名基准。
-- 默认优先使用父目录站点资源并输出到父目录；如果父目录没有资源，会依次查找脚本同级资源、`data` 极简资源。
-- 使用 `data` 极简资源时，工具左上角 `Book2HTML` 会标红显示“极简模式”，生成结果写到本目录的 `bookmarks_顶栏名.html`。
-- 如果目标文件已存在，页面会提示覆盖或自动加序号。
-- 可选把生成页跳转加入其他页面。
-- 可用单独按钮清理已删除生成页的跳转。
-
-如果端口被占用，脚本会从 `8765` 开始向后尝试。也可以手动指定：
+端口被占用时从 `8765` 向后顺延，也可手动指定：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\book2html-server.ps1 -Port 8899
@@ -71,3 +34,15 @@ powershell -ExecutionPolicy Bypass -File .\book2html-server.ps1 -Port 8899
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\book2html-server.ps1 -NoBrowser
 ```
+
+## 独立运行所需文件
+
+- `book2html-server.ps1`
+- `data/css/`、`data/js/`、`data/images/`
+
+与主项目联动时，父目录还需有主站自己的 `css/`、`js/`、`images/`。
+
+## 相关仓库
+
+- 主项目：<https://github.com/testsnow0722/index-main>
+- Book2HTML 独立仓库：<https://github.com/testsnow0722/Bookmarks-to-html>

@@ -892,7 +892,8 @@ function Update-Book2HtmlNavigation {
         }
 
         if ($newContent -ne $content) {
-          Set-Content -LiteralPath $_.FullName -Value $newContent -Encoding UTF8
+          $fullPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($_.FullName)
+          [System.IO.File]::WriteAllText($fullPath, $newContent, (New-Object System.Text.UTF8Encoding $false))
           $updatedCount++
         }
       }
@@ -1049,7 +1050,8 @@ function Write-BookmarksPage {
     New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
   }
 
-  Set-Content -LiteralPath $Path -Value $builder.ToString() -Encoding UTF8
+  $fullPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
+  [System.IO.File]::WriteAllText($fullPath, $builder.ToString(), (New-Object System.Text.UTF8Encoding $false))
   return $total
 }
 

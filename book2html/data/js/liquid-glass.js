@@ -48,6 +48,9 @@
   };
 
   // ---- displacement map 生成 ----
+  // 位移图按短边上限降采样，feImage 仍按元素全尺寸拉伸，避免大卡 1:1 像素图拖垮主线程。
+  const MAP_MAX_EDGE = 256;
+  const VIEW_MARGIN = 240;
   const dataUrlCache = new Map();
   const pendingWarmups = new Map();
   let warmupWorker = null;
@@ -56,21 +59,42 @@
   let warmupWorkerSeq = 0;
 
   const normalizeMapParams = (width, height, radius, bezel) => {
-    const w = Math.max(2, Math.round(width));
-    const h = Math.max(2, Math.round(height));
-    // bezel / radius 不能超过短边的一半
+    const fullW = Math.max(2, Math.round(width));
+    const fullH = Math.max(2, Math.round(height));
+    const scale = Math.min(1, MAP_MAX_EDGE / Math.max(fullW, fullH));
+    const w = Math.max(2, Math.round(fullW * scale));
+    const h = Math.max(2, Math.round(fullH * scale));
+    // bezel / radius 随降采样等比缩小，不能超过短边的一半
     const halfShort = Math.floor(Math.min(w, h) / 2);
-    const r = Math.min(radius, halfShort);
-    const b = Math.min(bezel, halfShort);
+    const r = Math.min(Math.max(0, Math.round(radius * scale)), halfShort);
+    const b = Math.min(Math.max(1, Math.round(bezel * scale)), halfShort);
 
     return {
       w,
       h,
       r,
       b,
+      fullW,
+      fullH,
       cacheKey: `${w}x${h}r${r}b${b}`
     };
   };
+
+  const isNearViewport = (el) => {
+    const rect = el.getBoundingClientRect();
+    const vh = window.innerHeight || document.documentElement.clientHeight || 0;
+    const vw = window.innerWidth || document.documentElement.clientWidth || 0;
+    return (
+      rect.bottom > -VIEW_MARGIN &&
+      rect.top < vh + VIEW_MARGIN &&
+      rect.right > -VIEW_MARGIN &&
+      rect.left < vw + VIEW_MARGIN
+    );
+  };
+
+  // 浮层 / 常驻控件始终即时 setup；大量 .nav-item 可按可视区懒加载
+  const isEagerElement = (el) =>
+    el.matches(".search-box, .search-engine, .preference-panel, .preference-toggle, .segmented-control");
 
   const fillDisplacementData = (data, w, h, r, b) => {
     for (let y = 0; y < h; y++) {
@@ -319,16 +343,21 @@
      * 给一个元素分配 / 更新独立 filter。
      * 元素尺寸为 0（display:none 或还没 layout）时直接跳过，等下一次再试。
      * 仅在 surface=liquid 时才写 inline backdrop-filter；否则只更新内部缓存。
+     * 大量导航卡仅在接近视口时完整 setup，减少首屏位移图生成量。
      */
-    const setupElement = (el) => {
+    const setupElement = (el, options = {}) => {
       const cfg = matchConfig(el);
       if (!cfg) return;
+      const force = Boolean(options.force);
       const rect = el.getBoundingClientRect();
       const w = Math.round(rect.width);
       const h = Math.round(rect.height);
       if (w < 4 || h < 4) return;
 
       const isLiquidActive = document.body.dataset.surface === "liquid";
+      if (isLiquidActive && !force && !isEagerElement(el) && !isNearViewport(el) && !elementMap.has(el)) {
+        return;
+      }
 
       let entry = elementMap.get(el);
       if (entry && entry.width === w && entry.height === h) {
@@ -350,6 +379,7 @@
       }
 
       const url = makeDisplacementMap(w, h, cfg.radius, cfg.bezel);
+      // displacement scale 用逻辑 bezel（全尺寸），与 map 降采样无关
       const baseScale = Math.min(cfg.bezel * 2.0, 36);
       const hoverScale = baseScale * cfg.hoverBoost;
 
@@ -483,11 +513,44 @@
       }
     };
 
-    // ---- 启动时给所有可悬停元素分配 filter（仅在液态玻璃下） ----
+    // ---- 启动：常驻控件立刻 setup；导航卡按视口懒加载 ----
     if (document.body.dataset.surface === "liquid") {
-      document.querySelectorAll(HOVER_SELECTOR).forEach(setupElement);
+      document.querySelectorAll(HOVER_SELECTOR).forEach((el) => {
+        if (isEagerElement(el) || isNearViewport(el)) {
+          setupElement(el, { force: isEagerElement(el) });
+        }
+      });
     } else {
       scheduleWarmup(document.querySelectorAll(HOVER_SELECTOR));
+    }
+
+    // 视口内卡片进入时再装 filter
+    if ("IntersectionObserver" in window) {
+      const io = new IntersectionObserver(
+        (entries) => {
+          if (!active) return;
+          for (const entry of entries) {
+            if (!entry.isIntersecting) continue;
+            setupElement(entry.target, { force: true });
+          }
+        },
+        { root: null, rootMargin: `${VIEW_MARGIN}px`, threshold: 0.01 }
+      );
+      document.querySelectorAll(".nav-item, .nav-section-title").forEach((el) => io.observe(el));
+    } else {
+      // 无 IO 时退化为滚动时补 setup
+      let scrollFlush = 0;
+      const onScroll = () => {
+        if (!active || scrollFlush) return;
+        scrollFlush = requestAnimationFrame(() => {
+          scrollFlush = 0;
+          document.querySelectorAll(".nav-item, .nav-section-title").forEach((el) => {
+            if (isNearViewport(el)) setupElement(el, { force: true });
+          });
+        });
+      };
+      window.addEventListener("scroll", onScroll, { passive: true });
+      window.addEventListener("resize", onScroll, { passive: true });
     }
 
     // ---- ResizeObserver：尺寸变化重新生成 ----
@@ -495,7 +558,7 @@
     const pendingResize = new Set();
     const flushResize = () => {
       if (active) {
-        pendingResize.forEach(setupElement);
+        pendingResize.forEach((el) => setupElement(el, { force: true }));
       } else {
         scheduleWarmup(pendingResize);
       }
@@ -517,7 +580,7 @@
     // 默认 hidden 的浮窗（搜索引擎下拉、偏好面板）：监听 hidden 属性变化，
     // 一变成可见立即 setup，避免"展开瞬间没玻璃"的空窗。
     const setupElementWithRetry = (el, retriesLeft = 3) => {
-      setupElement(el);
+      setupElement(el, { force: true });
       // 没拿到尺寸（display:none 残留 / layout 未完成）就 rAF 重试几次
       if (!elementMap.has(el) && retriesLeft > 0) {
         requestAnimationFrame(() => setupElementWithRetry(el, retriesLeft - 1));
@@ -599,16 +662,15 @@
           el.style.webkitBackdropFilter = "";
         });
       } else {
-        // 切回液态玻璃：重新给每个元素装上 inline filter
+        // 切回液态玻璃：常驻控件 + 近视口卡片立刻装 filter
         document.querySelectorAll(HOVER_SELECTOR).forEach((el) => {
           const entry = elementMap.get(el);
           if (entry) {
             const chain = `url(#${entry.id}) blur(2px) saturate(150%) brightness(1.02)`;
             el.style.backdropFilter = chain;
             el.style.webkitBackdropFilter = chain;
-          } else {
-            // 还没分配过 filter（比如初始 hidden 的浮窗）就现场尝试
-            setupElement(el);
+          } else if (isEagerElement(el) || isNearViewport(el)) {
+            setupElement(el, { force: isEagerElement(el) });
           }
         });
       }
@@ -626,7 +688,7 @@
         // 懒加载：默认 hidden 的元素（搜索引擎下拉、偏好面板）启动时尺寸为 0，
         // 第一次 hover 时再分配 filter
         if (!elementMap.has(target)) {
-          setupElement(target);
+          setupElement(target, { force: true });
           if (!elementMap.has(target)) return; // 真还没尺寸就放弃
         }
         if (currentHover) setHovered(currentHover, false);

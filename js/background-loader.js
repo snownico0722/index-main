@@ -13,7 +13,6 @@
     dark: resolveImageUrl("theme-bg-obsidian.jpg"),
     glass: resolveImageUrl("theme-bg-glass.jpg"),
     liquid: resolveImageUrl("theme-bg-liquid.jpg"),
-    "liquid-lite": resolveImageUrl("theme-bg-liquid-lite.jpg"),
     acrylic: resolveImageUrl("theme-bg-acrylic.jpg"),
     mica: resolveImageUrl("theme-bg-mica.jpg"),
     paper: resolveImageUrl("theme-bg-paper.jpg"),

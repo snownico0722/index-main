@@ -25,7 +25,6 @@
     surface: [
       { value: "glass", label: "毛玻璃" },
       { value: "liquid", label: "液态玻璃" },
-      { value: "liquid-lite", label: "液态·兼容" },
       { value: "acrylic", label: "亚克力" },
       { value: "mica", label: "云母" },
       { value: "paper", label: "磨砂纸" },
@@ -55,7 +54,7 @@
   };
   const preferenceGroups = ["theme", "surface", "density", "themeBackgroundPriority", "backgroundBlur", "textColor"];
   const advancedPreferenceGroups = ["textBrightness", "cardBrightness", "cardOpacity", "textContrast", "textContrastMethod"];
-  const nativeCardRendererSurfaces = new Set(["acrylic", "obsidian", "liquid", "liquid-lite", "pixel", "neon"]);
+  const nativeCardRendererSurfaces = new Set(["acrylic", "mica", "obsidian", "liquid", "pixel", "neon"]);
   const textColorPalette = [
     { value: "#111827", label: "墨黑" },
     { value: "#475569", label: "岩灰" },

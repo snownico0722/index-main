@@ -574,17 +574,21 @@ input::-webkit-input-placeholder {
   z-index: 999;
   transition: all 0.3s ease;
   border: 1px solid transparent;
+  /* 收纳内部 float 选项，避免面板高度塌陷导致背景/命中区与选项错位 */
+  display: flow-root;
 }
 .search-engine[hidden] {
   display: none !important;
 }
 .search-engine:not([hidden]) {
-  display: block;
+  display: flow-root;
 }
 
 .search-engine-list {
   margin: 0;
   padding: 0 0 0 15px;
+  /* 包含 float 子项，保证列表高度撑开面板 */
+  display: flow-root;
 }
 .search-engine-list::after {
   content: "";
@@ -1201,6 +1205,45 @@ body.site-page[data-theme="dark"] {
   color-scheme: dark;
 }
 
+/* 毛玻璃：显式 token，与全局默认对齐，避免 glass 隐式依赖 body 默认值。
+   改默认皮肤时只需同步这里，不会误伤「毛玻璃」语义。 */
+body.site-page[data-surface="glass"] {
+  --header-bg: rgba(255, 255, 255, 0.5);
+  --header-border: rgba(255, 255, 255, 0.4);
+  --card-bg: rgba(255, 255, 255, 0.25);
+  --card-bg-strong: rgba(255, 255, 255, 0.45);
+  --card-opacity-color: #fff;
+  --card-strong-opacity-color: #fff;
+  --panel-opacity-color: #fff;
+  --card-border: rgba(255, 255, 255, 0.3);
+  --card-shadow: 0 1px 6px 1px rgba(0, 0, 0, 0.03);
+  --panel-bg: rgba(255, 255, 255, 0.5);
+  --control-bg: rgba(255, 255, 255, 0.3);
+  --control-active-bg: #fff;
+  --control-border: rgba(0, 0, 0, 0.08);
+  --surface-blur: blur(16px) saturate(220%) brightness(1.08);
+  --surface-sheen: rgba(255, 255, 255, 0.36);
+  --surface-rim: rgba(255, 255, 255, 0.42);
+}
+body.site-page[data-theme="dark"][data-surface="glass"] {
+  --header-bg: rgba(15, 23, 42, 0.6);
+  --header-border: rgba(148, 163, 184, 0.28);
+  --card-bg: rgba(15, 23, 42, 0.28);
+  --card-bg-strong: rgba(30, 41, 59, 0.48);
+  --card-opacity-color: #0f172a;
+  --card-strong-opacity-color: #1e293b;
+  --panel-opacity-color: #0f172a;
+  --card-border: rgba(148, 163, 184, 0.24);
+  --card-shadow: 0 12px 28px rgba(0, 0, 0, 0.24);
+  --panel-bg: rgba(15, 23, 42, 0.55);
+  --control-bg: rgba(30, 41, 59, 0.4);
+  --control-active-bg: rgba(96, 165, 250, 0.24);
+  --control-border: rgba(148, 163, 184, 0.28);
+  --surface-blur: blur(16px) saturate(200%) brightness(0.95);
+  --surface-sheen: rgba(255, 255, 255, 0.1);
+  --surface-rim: rgba(226, 232, 240, 0.18);
+}
+
 /* 简洁质感（无毛玻璃） */
 body.site-page[data-surface="plain"] {
   --site-style-background:
@@ -1240,96 +1283,110 @@ body.site-page[data-theme="dark"][data-surface="plain"] {
   --control-active-bg: #273449;
 }
 
-/* 亚克力（更柔和的磨砂） */
+/* 亚克力（Fluent 近似）：厚磨砂 + 系统色染（soft-light 近似 luminosity 色染）+ 内描边。
+   真 Win Acrylic 的 luminosity 合成在纯 CSS 里无法完整复刻；用 soft-light 色染层
+   让壁纸明暗渗入 tint，同时保留板材厚度感。 */
 body.site-page[data-surface="acrylic"] {
   --site-style-background:
     linear-gradient(118deg, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0) 34%),
-    linear-gradient(135deg, #dbeafe 0%, #f8fafc 38%, #fce7f3 68%, #e0f2fe 100%);
+    linear-gradient(135deg, #dbeafe 0%, #f8fafc 38%, #e8eef8 68%, #e0f2fe 100%);
   --site-style-background-size: cover, cover;
   --site-style-background-position: center, center;
   --site-style-background-repeat: no-repeat, no-repeat;
-  --header-bg: rgba(248, 250, 252, 0.72);
+  --header-bg: rgba(248, 250, 252, 0.62);
   --header-border: rgba(255, 255, 255, 0.54);
-  --card-bg: rgba(248, 250, 252, 0.58);
-  --card-bg-strong: rgba(255, 255, 255, 0.76);
+  --card-bg: rgba(248, 250, 252, 0.4);
+  --card-bg-strong: rgba(255, 255, 255, 0.6);
   --card-opacity-color: #f8fafc;
   --card-strong-opacity-color: #fff;
   --panel-opacity-color: #f8fafc;
   --card-border: rgba(255, 255, 255, 0.48);
   --card-shadow: 0 16px 38px rgba(15, 23, 42, 0.1);
-  --panel-bg: rgba(248, 250, 252, 0.82);
-  --control-bg: rgba(255, 255, 255, 0.58);
-  --control-active-bg: rgba(255, 255, 255, 0.9);
-  --surface-blur: blur(18px) saturate(155%);
+  --panel-bg: rgba(248, 250, 252, 0.66);
+  --control-bg: rgba(255, 255, 255, 0.48);
+  --control-active-bg: rgba(255, 255, 255, 0.88);
+  --surface-blur: blur(20px) saturate(175%) brightness(1.03);
+  --surface-sheen: rgba(255, 255, 255, 0.42);
+  --surface-rim: rgba(255, 255, 255, 0.5);
+  --acrylic-tint: rgba(196, 214, 240, 0.55);
+  --acrylic-tint-soft: rgba(232, 240, 252, 0.4);
+  --acrylic-luminosity: soft-light;
 }
 body.site-page[data-theme="dark"][data-surface="acrylic"] {
   --site-style-background:
     linear-gradient(118deg, rgba(148, 163, 184, 0.16), rgba(15, 23, 42, 0) 36%),
-    linear-gradient(135deg, #08111f 0%, #111827 42%, #312e81 70%, #0f172a 100%);
+    linear-gradient(135deg, #08111f 0%, #111827 42%, #1e293b 70%, #0f172a 100%);
   --site-style-background-size: cover, cover;
   --site-style-background-position: center, center;
   --site-style-background-repeat: no-repeat, no-repeat;
-  --header-bg: rgba(15, 23, 42, 0.68);
+  --header-bg: rgba(15, 23, 42, 0.58);
   --header-border: rgba(148, 163, 184, 0.26);
-  --card-bg: rgba(15, 23, 42, 0.56);
-  --card-bg-strong: rgba(30, 41, 59, 0.72);
+  --card-bg: rgba(15, 23, 42, 0.4);
+  --card-bg-strong: rgba(30, 41, 59, 0.58);
   --card-opacity-color: #0f172a;
   --card-strong-opacity-color: #1e293b;
   --panel-opacity-color: #0f172a;
   --card-border: rgba(148, 163, 184, 0.24);
   --card-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
-  --panel-bg: rgba(15, 23, 42, 0.82);
-  --control-bg: rgba(30, 41, 59, 0.64);
+  --panel-bg: rgba(15, 23, 42, 0.66);
+  --control-bg: rgba(30, 41, 59, 0.52);
   --control-active-bg: rgba(96, 165, 250, 0.22);
-  --surface-blur: blur(18px) saturate(140%);
+  --surface-blur: blur(20px) saturate(150%) brightness(0.98);
+  --surface-sheen: rgba(255, 255, 255, 0.12);
+  --surface-rim: rgba(148, 163, 184, 0.22);
+  --acrylic-tint: rgba(56, 80, 120, 0.45);
+  --acrylic-tint-soft: rgba(30, 41, 59, 0.35);
+  --acrylic-luminosity: soft-light;
 }
 
-/* 云母（Win11 Mica）：参考 yell0wsuit/acrylic-mica-css 的配方调整。
-   核心：高 blur (40px) 把壁纸细节糊掉，再用半透明系统底色让壁纸色温微微渗出。
-   原参考 alpha 0.86 在真实壁纸上太厚，这里降到 0.55，保留 Mica 安静感的同时
-   让背景色透出来。 */
+/* 云母（Win11 Mica）：高 blur 糊掉壁纸细节 + 半透明系统底吃壁纸色温。
+   native 渲染器保护材质层；阴影刻意放轻，保持「安静桌面」而不是悬浮卡。 */
 body.site-page[data-surface="mica"] {
   --site-style-background:
-    linear-gradient(100deg, rgba(226, 232, 240, 0.82), rgba(226, 232, 240, 0) 44%),
-    linear-gradient(145deg, #f8fafc 0%, #dbeafe 48%, #f1f5f9 100%);
+    linear-gradient(100deg, rgba(226, 232, 240, 0.55), rgba(226, 232, 240, 0) 48%),
+    linear-gradient(145deg, #eef2f7 0%, #d7e3f0 48%, #e8eef5 100%);
   --site-style-background-size: cover, cover;
   --site-style-background-position: center, center;
   --site-style-background-repeat: no-repeat, no-repeat;
-  --header-bg: rgba(247, 249, 252, 0.62);
+  --header-bg: rgba(247, 249, 252, 0.58);
   --header-border: rgba(0, 0, 0, 0.06);
-  --card-bg: rgba(247, 249, 252, 0.55);
-  --card-bg-strong: rgba(252, 253, 255, 0.75);
+  --card-bg: rgba(247, 249, 252, 0.48);
+  --card-bg-strong: rgba(252, 253, 255, 0.68);
   --card-opacity-color: #f7f9fc;
   --card-strong-opacity-color: #fcfdff;
   --panel-opacity-color: #f7f9fc;
-  --card-border: rgba(0, 0, 0, 0.06);
-  --card-shadow: 0 25px 57px rgba(0, 0, 0, 0.12), 0 0 16px rgba(0, 0, 0, 0.08);
-  --panel-bg: rgba(247, 249, 252, 0.72);
+  --card-border: rgba(0, 0, 0, 0.05);
+  --card-shadow: 0 6px 18px rgba(15, 23, 42, 0.05), 0 1px 0 rgba(255, 255, 255, 0.55) inset;
+  --panel-bg: rgba(247, 249, 252, 0.66);
   --control-bg: rgba(0, 0, 0, 0.04);
   --control-active-bg: rgba(255, 255, 255, 0.7);
   --control-border: rgba(0, 0, 0, 0.08);
-  --surface-blur: blur(40px);
+  --surface-blur: blur(40px) saturate(118%);
+  --mica-tint: rgba(226, 236, 248, 0.38);
+  --mica-luminosity: luminosity;
 }
 body.site-page[data-theme="dark"][data-surface="mica"] {
   --site-style-background:
-    linear-gradient(100deg, rgba(71, 85, 105, 0.38), rgba(15, 23, 42, 0) 46%),
+    linear-gradient(100deg, rgba(71, 85, 105, 0.32), rgba(15, 23, 42, 0) 48%),
     linear-gradient(145deg, #101827 0%, #1f2937 48%, #0f172a 100%);
   --site-style-background-size: cover, cover;
   --site-style-background-position: center, center;
   --site-style-background-repeat: no-repeat, no-repeat;
-  --header-bg: rgba(35, 39, 52, 0.62);
+  --header-bg: rgba(35, 39, 52, 0.58);
   --header-border: rgba(255, 255, 255, 0.06);
-  --card-bg: rgba(35, 39, 52, 0.55);
-  --card-bg-strong: rgba(44, 49, 66, 0.75);
+  --card-bg: rgba(35, 39, 52, 0.48);
+  --card-bg-strong: rgba(44, 49, 66, 0.68);
   --card-opacity-color: #232734;
   --card-strong-opacity-color: #2c3142;
   --panel-opacity-color: #232734;
   --card-border: rgba(255, 255, 255, 0.06);
-  --card-shadow: 0 25px 57px rgba(0, 0, 0, 0.42), 0 0 16px rgba(0, 0, 0, 0.32);
-  --panel-bg: rgba(35, 39, 52, 0.72);
+  --card-shadow: 0 8px 22px rgba(0, 0, 0, 0.28), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+  --panel-bg: rgba(35, 39, 52, 0.66);
   --control-bg: rgba(255, 255, 255, 0.06);
   --control-active-bg: rgba(255, 255, 255, 0.14);
-  --surface-blur: blur(40px);
+  --surface-blur: blur(40px) saturate(112%);
+  --mica-tint: rgba(60, 72, 96, 0.4);
+  --mica-luminosity: luminosity;
 }
 
 /* 磨砂纸：完全不透明的米白色 + SVG 噪声纸纹。
@@ -1415,10 +1472,8 @@ body.site-page[data-surface="obsidian"] {
   color-scheme: dark;
 }
 
-/* 液态玻璃 ─ 思路：单层底色 + 顶部高光 + 角落光斑 + 锐利白边 + 柔阴影 */
-body.site-page[data-surface="liquid"],
-
-body.site-page[data-surface="liquid-lite"]  {
+/* 液态玻璃 ─ 思路：单层底色 + 顶部高光 + 锐利白边 + 柔阴影；Chromium 另由 JS 做真折射 */
+body.site-page[data-surface="liquid"] {
   --site-style-background:
     linear-gradient(115deg, rgba(255, 255, 255, 0.72), transparent 30%),
     linear-gradient(150deg, #dff6ff 0%, #eef2ff 34%, #fde2ff 66%, #dbeafe 100%);
@@ -1443,8 +1498,7 @@ body.site-page[data-surface="liquid-lite"]  {
   --surface-blur: blur(20px) saturate(170%) brightness(1.05);
   --liquid-edge: rgba(255, 255, 255, 0.78);
 }
-body.site-page[data-theme="dark"][data-surface="liquid"],
-body.site-page[data-theme="dark"][data-surface="liquid-lite"]  {
+body.site-page[data-theme="dark"][data-surface="liquid"] {
   --site-style-background:
     linear-gradient(115deg, rgba(125, 211, 252, 0.16), transparent 32%),
     linear-gradient(150deg, #020617 0%, #172554 38%, #2e1065 68%, #0f172a 100%);
@@ -1468,49 +1522,6 @@ body.site-page[data-theme="dark"][data-surface="liquid-lite"]  {
   --control-active-bg: rgba(96, 165, 250, 0.28);
   --surface-blur: blur(20px) saturate(150%) brightness(0.98);
   --liquid-edge: rgba(255, 255, 255, 0.28);
-}
-
-/* 液态·兼容（liquid-lite）：减少模糊量、保留 1px 锐利白边。
-   只靠"半透明白底 + backdrop-filter blur + saturate"三件套，没有任何虚假反光。 */
-body.site-page[data-surface="liquid-lite"] {
-  --site-style-background:
-    linear-gradient(112deg, rgba(255, 255, 255, 0.62), transparent 30%),
-    linear-gradient(145deg, #eff6ff 0%, #dbeafe 46%, #f8fafc 100%);
-  --site-style-background-size: cover, cover;
-  --site-style-background-position: center, center;
-  --site-style-background-repeat: no-repeat, no-repeat;
-  --surface-blur: blur(8px) saturate(160%) brightness(1.06);
-  --card-bg: rgba(255, 255, 255, 0.12);
-  --card-bg-strong: rgba(255, 255, 255, 0.24);
-  --card-opacity-color: #fff;
-  --card-strong-opacity-color: #fff;
-  --panel-opacity-color: #fff;
-  --liquid-edge: rgba(255, 255, 255, 0.85);
-}
-body.site-page[data-theme="dark"][data-surface="liquid-lite"] {
-  --site-style-background:
-    linear-gradient(112deg, rgba(147, 197, 253, 0.14), transparent 32%),
-    linear-gradient(145deg, #0f172a 0%, #1e293b 48%, #111827 100%);
-  --site-style-background-size: cover, cover;
-  --site-style-background-position: center, center;
-  --site-style-background-repeat: no-repeat, no-repeat;
-  --surface-blur: blur(8px) saturate(150%) brightness(0.98);
-  --card-bg: rgba(15, 23, 42, 0.18);
-  --card-bg-strong: rgba(30, 41, 59, 0.32);
-  --card-opacity-color: #0f172a;
-  --card-strong-opacity-color: #1e293b;
-  --panel-opacity-color: #0f172a;
-  --liquid-edge: rgba(255, 255, 255, 0.32);
-}
-
-/* 兼容版直接关掉底部反光那层伪元素 */
-body.site-page[data-surface="liquid-lite"] .nav-item::after,
-body.site-page[data-surface="liquid-lite"] .search-engine::after,
-body.site-page[data-surface="liquid-lite"] .preference-panel::after,
-body.site-page[data-surface="liquid-lite"] .search-box::after,
-body.site-page[data-surface="liquid-lite"] .preference-toggle::after,
-body.site-page[data-surface="liquid-lite"] .segmented-control::after {
-  display: none;
 }
 
 /* 头部应用主题变量 */
@@ -1606,15 +1617,7 @@ body.site-page[data-surface="liquid"] .search-engine,
 body.site-page[data-surface="liquid"] .preference-panel,
 body.site-page[data-surface="liquid"] .search-box,
 body.site-page[data-surface="liquid"] .preference-toggle,
-body.site-page[data-surface="liquid"] .segmented-control,
-
-body.site-page[data-surface="liquid-lite"] .nav-item,
-body.site-page[data-surface="liquid-lite"] .nav-section-title,
-body.site-page[data-surface="liquid-lite"] .search-engine,
-body.site-page[data-surface="liquid-lite"] .preference-panel,
-body.site-page[data-surface="liquid-lite"] .search-box,
-body.site-page[data-surface="liquid-lite"] .preference-toggle,
-body.site-page[data-surface="liquid-lite"] .segmented-control  {
+body.site-page[data-surface="liquid"] .segmented-control {
   isolation: isolate;
   overflow: hidden;
   border: 1px solid var(--liquid-edge);
@@ -1623,41 +1626,25 @@ body.site-page[data-surface="liquid-lite"] .segmented-control  {
   -webkit-backdrop-filter: var(--surface-blur);
 }
 body.site-page[data-surface="liquid"] .nav-item,
-body.site-page[data-surface="liquid"] .nav-section-title,
-body.site-page[data-surface="liquid-lite"] .nav-item,
-body.site-page[data-surface="liquid-lite"] .nav-section-title {
+body.site-page[data-surface="liquid"] .nav-section-title {
   background: var(--card-final-bg);
 }
 body.site-page[data-surface="liquid"] .search-engine,
-body.site-page[data-surface="liquid"] .search-box,
-body.site-page[data-surface="liquid-lite"] .search-engine,
-body.site-page[data-surface="liquid-lite"] .search-box {
+body.site-page[data-surface="liquid"] .search-box {
   background: var(--panel-final-bg);
 }
-body.site-page[data-surface="liquid"] .preference-panel,
-body.site-page[data-surface="liquid-lite"] .preference-panel {
+body.site-page[data-surface="liquid"] .preference-panel {
   background: var(--panel-bg);
-}
-
-body.site-page[data-surface="liquid"] .preference-panel,
-body.site-page[data-surface="liquid-lite"] .preference-panel {
   overflow-x: hidden;
   overflow-y: auto;
 }
 
-/* 给原本 static 的容器额外设 relative，让 ::before/::after 能以自身为锚。
-   .search-engine / .preference-panel 保留原本的 absolute 浮窗定位，不在此列。 */
+/* 给原本 static 的容器额外设 relative；search-engine / preference-panel 保留浮窗定位 */
 body.site-page[data-surface="liquid"] .nav-item,
 body.site-page[data-surface="liquid"] .nav-section-title,
 body.site-page[data-surface="liquid"] .search-box,
 body.site-page[data-surface="liquid"] .preference-toggle,
-body.site-page[data-surface="liquid"] .segmented-control,
-
-body.site-page[data-surface="liquid-lite"] .nav-item,
-body.site-page[data-surface="liquid-lite"] .nav-section-title,
-body.site-page[data-surface="liquid-lite"] .search-box,
-body.site-page[data-surface="liquid-lite"] .preference-toggle,
-body.site-page[data-surface="liquid-lite"] .segmented-control  {
+body.site-page[data-surface="liquid"] .segmented-control {
   position: relative;
 }
 
@@ -1667,70 +1654,49 @@ body.site-page[data-surface="liquid"] .search-engine > *,
 body.site-page[data-surface="liquid"] .preference-panel > *,
 body.site-page[data-surface="liquid"] .search-box > *,
 body.site-page[data-surface="liquid"] .preference-toggle > *,
-body.site-page[data-surface="liquid"] .segmented-control > *,
-
-body.site-page[data-surface="liquid-lite"] .nav-item > *,
-body.site-page[data-surface="liquid-lite"] .search-engine > *,
-body.site-page[data-surface="liquid-lite"] .preference-panel > *,
-body.site-page[data-surface="liquid-lite"] .search-box > *,
-body.site-page[data-surface="liquid-lite"] .preference-toggle > *,
-body.site-page[data-surface="liquid-lite"] .segmented-control > *  {
+body.site-page[data-surface="liquid"] .segmented-control > * {
   position: relative;
   z-index: 1;
 }
 
-/* hover：Apple Liquid Glass 风格——bouncy 弹性缩放 + 阴影加深。
-   关键参考：Apple 文档强调 "gel-like flexibility"、"scaling on press"、"bouncing animation"。
-   用 cubic-bezier 模拟轻微弹性，整张卡片像凝胶被按压时轻微膨胀。 */
-body.site-page[data-surface="liquid"] .nav-item,
-body.site-page[data-surface="liquid-lite"] .nav-item {
+/* hover：凝胶弹性缩放 */
+body.site-page[data-surface="liquid"] .nav-item {
   transition:
     transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
     box-shadow 0.28s ease;
 }
-body.site-page[data-surface="liquid"] .nav-item:hover,
-body.site-page[data-surface="liquid-lite"] .nav-item:hover {
+body.site-page[data-surface="liquid"] .nav-item:hover {
   transform: scale(1.025) translateY(-2px);
   box-shadow:
     0 22px 44px -16px rgba(15, 23, 42, 0.28),
     0 8px 16px -10px rgba(15, 23, 42, 0.18);
 }
-body.site-page[data-surface="liquid"] .nav-item:active,
-body.site-page[data-surface="liquid-lite"] .nav-item:active {
+body.site-page[data-surface="liquid"] .nav-item:active {
   transform: scale(0.985);
   transition:
     transform 0.1s cubic-bezier(0.22, 1, 0.36, 1),
     box-shadow 0.1s ease;
 }
-body.site-page[data-theme="dark"][data-surface="liquid"] .nav-item:hover,
-body.site-page[data-theme="dark"][data-surface="liquid-lite"] .nav-item:hover {
+body.site-page[data-theme="dark"][data-surface="liquid"] .nav-item:hover {
   box-shadow:
     0 22px 44px -16px rgba(0, 0, 0, 0.55),
     0 8px 16px -10px rgba(0, 0, 0, 0.4);
 }
 
-/* 搜索框相关元素的层级修复（保持原有定位行为） */
-body.site-page[data-surface="liquid"] .search-box .search-input,
-
-body.site-page[data-surface="liquid-lite"] .search-box .search-input  {
+/* 搜索框相关元素的层级修复 */
+body.site-page[data-surface="liquid"] .search-box .search-input {
   position: relative;
   z-index: 1;
   background: transparent;
 }
 body.site-page[data-surface="liquid"] .search-box .search-engine-toggle,
-body.site-page[data-surface="liquid"] .search-box .search-btn,
-body.site-page[data-surface="liquid-lite"] .search-box .search-engine-toggle,
-body.site-page[data-surface="liquid-lite"] .search-box .search-btn  {
+body.site-page[data-surface="liquid"] .search-box .search-btn {
   position: absolute;
   z-index: 2;
 }
 
-/* ─── 真折射：每元素一份独立 SVG filter（JS 注入 <feImage> + <feDisplacementMap>）───
- * 仅 Chromium 系生效。CSS 这边只负责：
- *   1. 让支持的浏览器底色变薄（否则看不到折射）。
- *   2. 隐藏伪液态玻璃的 ::before / ::after 反光（这些只服务于回退）。
- *   3. 提供 prefers-reduced-motion 兜底。
- * inline backdrop-filter 由 JS 给每个元素单独写。
+/* ─── 真折射：每元素一份独立 SVG filter（JS 注入）───
+ * 仅 Chromium 系生效。位移图按 256px 边长上限降采样，并按视口懒加载导航卡。
  */
 html[data-liquid-glass-supported="true"] body.site-page[data-surface="liquid"] .nav-item,
 html[data-liquid-glass-supported="true"] body.site-page[data-surface="liquid"] .nav-section-title {
@@ -1769,10 +1735,8 @@ html[data-liquid-glass-supported="true"] body.site-page[data-surface="liquid"] .
   background: var(--header-final-bg) !important;
 }
 
-/* header::before 在液态玻璃下不需要——真折射模式 header 没 backdrop-filter，
-   伪液态玻璃模式 header 也不需要那道横向反光。 */
-body.site-page[data-surface="liquid"] .header::before,
-body.site-page[data-surface="liquid-lite"] .header::before {
+/* header::before 在液态玻璃下不需要 */
+body.site-page[data-surface="liquid"] .header::before {
   display: none;
 }
 
@@ -1782,17 +1746,121 @@ body.site-page[data-surface="liquid-lite"] .header::before {
   }
 }
 
-/* 亚克力质感的内描边 */
+/* 亚克力：板材内描边 + soft-light 色染层（近似 Fluent Acrylic 的 luminosity 染色）。
+   .search-engine / .preference-panel 保持 absolute/fixed，只加 isolation。 */
 body.site-page[data-surface="acrylic"] .nav-item,
+body.site-page[data-surface="acrylic"] .nav-section-title,
 body.site-page[data-surface="acrylic"] .search-box,
 body.site-page[data-surface="acrylic"] .search-engine,
 body.site-page[data-surface="acrylic"] .preference-panel,
 body.site-page[data-surface="acrylic"] .preference-toggle,
 body.site-page[data-surface="acrylic"] .segmented-control {
+  isolation: isolate;
+  overflow: hidden;
   box-shadow:
     inset 0 1px 0 var(--surface-sheen),
     inset 0 0 0 1px var(--surface-rim),
     var(--card-shadow);
+}
+body.site-page[data-surface="acrylic"] .nav-item,
+body.site-page[data-surface="acrylic"] .nav-section-title,
+body.site-page[data-surface="acrylic"] .search-box,
+body.site-page[data-surface="acrylic"] .preference-toggle,
+body.site-page[data-surface="acrylic"] .segmented-control {
+  position: relative;
+}
+body.site-page[data-surface="acrylic"] .preference-panel {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+body.site-page[data-surface="acrylic"] .nav-item::before,
+body.site-page[data-surface="acrylic"] .nav-section-title::before,
+body.site-page[data-surface="acrylic"] .search-box::before,
+body.site-page[data-surface="acrylic"] .search-engine::before,
+body.site-page[data-surface="acrylic"] .preference-panel::before,
+body.site-page[data-surface="acrylic"] .preference-toggle::before,
+body.site-page[data-surface="acrylic"] .segmented-control::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    linear-gradient(145deg, var(--acrylic-tint) 0%, transparent 48%, var(--acrylic-tint-soft) 100%);
+  mix-blend-mode: var(--acrylic-luminosity, soft-light);
+  opacity: 0.88;
+}
+body.site-page[data-surface="acrylic"] .nav-item > *,
+body.site-page[data-surface="acrylic"] .nav-section-title > *,
+body.site-page[data-surface="acrylic"] .search-box > *,
+body.site-page[data-surface="acrylic"] .search-engine > *,
+body.site-page[data-surface="acrylic"] .preference-panel > *,
+body.site-page[data-surface="acrylic"] .preference-toggle > *,
+body.site-page[data-surface="acrylic"] .segmented-control > * {
+  position: relative;
+  z-index: 1;
+}
+body.site-page[data-surface="acrylic"] .search-box .search-engine-toggle,
+body.site-page[data-surface="acrylic"] .search-box .search-btn {
+  position: absolute;
+  z-index: 2;
+}
+
+/* 云母：更轻的 luminosity 色温层 + 安静阴影（native，不走 generic 伪底） */
+body.site-page[data-surface="mica"] .nav-item,
+body.site-page[data-surface="mica"] .nav-section-title,
+body.site-page[data-surface="mica"] .search-box,
+body.site-page[data-surface="mica"] .search-engine,
+body.site-page[data-surface="mica"] .preference-panel,
+body.site-page[data-surface="mica"] .preference-toggle,
+body.site-page[data-surface="mica"] .segmented-control {
+  isolation: isolate;
+  overflow: hidden;
+  box-shadow: var(--card-shadow);
+}
+body.site-page[data-surface="mica"] .nav-item,
+body.site-page[data-surface="mica"] .nav-section-title,
+body.site-page[data-surface="mica"] .search-box,
+body.site-page[data-surface="mica"] .preference-toggle,
+body.site-page[data-surface="mica"] .segmented-control {
+  position: relative;
+}
+body.site-page[data-surface="mica"] .preference-panel {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+body.site-page[data-surface="mica"] .nav-item::before,
+body.site-page[data-surface="mica"] .nav-section-title::before,
+body.site-page[data-surface="mica"] .search-box::before,
+body.site-page[data-surface="mica"] .search-engine::before,
+body.site-page[data-surface="mica"] .preference-panel::before,
+body.site-page[data-surface="mica"] .preference-toggle::before,
+body.site-page[data-surface="mica"] .segmented-control::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: var(--mica-tint);
+  mix-blend-mode: var(--mica-luminosity, luminosity);
+  opacity: 0.55;
+}
+body.site-page[data-surface="mica"] .nav-item > *,
+body.site-page[data-surface="mica"] .nav-section-title > *,
+body.site-page[data-surface="mica"] .search-box > *,
+body.site-page[data-surface="mica"] .search-engine > *,
+body.site-page[data-surface="mica"] .preference-panel > *,
+body.site-page[data-surface="mica"] .preference-toggle > *,
+body.site-page[data-surface="mica"] .segmented-control > * {
+  position: relative;
+  z-index: 1;
+}
+body.site-page[data-surface="mica"] .search-box .search-engine-toggle,
+body.site-page[data-surface="mica"] .search-box .search-btn {
+  position: absolute;
+  z-index: 2;
 }
 
 /* 磨砂纸：用真实纸纹 PNG 全屏覆盖。
@@ -2153,117 +2221,115 @@ body.site-page[data-surface="pixel"] .segmented-option.is-active {
   background: #3d4860;
 }
 
-/* 简洁背景优先：避免大面积白底，让浅色半透明卡片仍然有轮廓。 */
+/* 简洁背景优先：多层大气渐变，不用网格噪点，给半透明卡片留轮廓。 */
 body.site-page[data-theme-background-priority="simple"] {
-  --background-dim: rgba(15, 23, 42, 0.06);
+  --background-dim: rgba(15, 23, 42, 0.04);
   --site-style-background:
-    linear-gradient(rgba(15, 23, 42, 0.09) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(15, 23, 42, 0.07) 1px, transparent 1px),
-    linear-gradient(135deg, #d8e3ef 0%, #bccbdd 50%, #d3dfeb 100%);
-  --site-style-background-size: 44px 44px, 44px 44px, cover;
+    radial-gradient(ellipse 90% 70% at 12% 8%, rgba(255, 255, 255, 0.55), transparent 55%),
+    radial-gradient(ellipse 80% 60% at 88% 92%, rgba(148, 163, 184, 0.28), transparent 50%),
+    linear-gradient(145deg, #e8eef6 0%, #d5e0ec 42%, #e4ebf3 100%);
+  --site-style-background-size: cover, cover, cover;
   --site-style-background-position: center, center, center;
-  --site-style-background-repeat: repeat, repeat, no-repeat;
+  --site-style-background-repeat: no-repeat, no-repeat, no-repeat;
 }
 body.site-page[data-theme-background-priority="simple"][data-surface="glass"] {
   --site-style-background:
-    linear-gradient(120deg, rgba(255, 255, 255, 0.26), transparent 32%),
-    repeating-linear-gradient(90deg, rgba(37, 99, 235, 0.12) 0 1px, transparent 1px 46px),
-    linear-gradient(135deg, #c8d9ea 0%, #aebfd2 46%, #d6e3ef 100%);
-  --site-style-background-size: cover, 46px 46px, cover;
+    radial-gradient(ellipse 70% 55% at 18% 12%, rgba(255, 255, 255, 0.72), transparent 48%),
+    radial-gradient(ellipse 55% 50% at 82% 78%, rgba(147, 197, 253, 0.35), transparent 52%),
+    linear-gradient(135deg, #c9dcf0 0%, #b4c9df 48%, #d8e6f4 100%);
+  --site-style-background-size: cover, cover, cover;
   --site-style-background-position: center, center, center;
-  --site-style-background-repeat: no-repeat, repeat, no-repeat;
+  --site-style-background-repeat: no-repeat, no-repeat, no-repeat;
 }
 body.site-page[data-theme-background-priority="simple"][data-surface="plain"] {
   --site-style-background:
-    linear-gradient(rgba(15, 23, 42, 0.1) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(15, 23, 42, 0.08) 1px, transparent 1px),
-    linear-gradient(135deg, #d1dce8 0%, #b8c6d6 55%, #ccd7e3 100%);
-  --site-style-background-size: 56px 56px, 56px 56px, cover;
-  --site-style-background-position: center, center, center;
-  --site-style-background-repeat: repeat, repeat, no-repeat;
+    radial-gradient(ellipse 85% 60% at 50% 0%, rgba(255, 255, 255, 0.5), transparent 58%),
+    linear-gradient(160deg, #d9e3ee 0%, #c2d0de 52%, #d4dee8 100%);
+  --site-style-background-size: cover, cover;
+  --site-style-background-position: center, center;
+  --site-style-background-repeat: no-repeat, no-repeat;
 }
 body.site-page[data-theme-background-priority="simple"][data-surface="acrylic"] {
   --site-style-background:
-    linear-gradient(118deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 34%),
-    repeating-linear-gradient(135deg, rgba(30, 64, 175, 0.1) 0 1px, transparent 1px 34px),
-    linear-gradient(135deg, #c7d7ea 0%, #b7c4dd 38%, #d7b7c9 68%, #bfd6e9 100%);
-  --site-style-background-size: cover, 34px 34px, cover;
+    radial-gradient(ellipse 60% 50% at 15% 20%, rgba(255, 255, 255, 0.55), transparent 50%),
+    radial-gradient(ellipse 50% 45% at 78% 70%, rgba(196, 181, 253, 0.28), transparent 55%),
+    linear-gradient(135deg, #c5d6ec 0%, #b8c4e0 36%, #d4b8c8 68%, #c2d8ea 100%);
+  --site-style-background-size: cover, cover, cover;
   --site-style-background-position: center, center, center;
-  --site-style-background-repeat: no-repeat, repeat, no-repeat;
+  --site-style-background-repeat: no-repeat, no-repeat, no-repeat;
 }
 body.site-page[data-theme-background-priority="simple"][data-surface="mica"] {
   --site-style-background:
-    linear-gradient(100deg, rgba(226, 232, 240, 0.35), rgba(226, 232, 240, 0) 44%),
-    repeating-linear-gradient(0deg, rgba(30, 41, 59, 0.08) 0 1px, transparent 1px 40px),
-    linear-gradient(145deg, #ced8e5 0%, #b8c8dc 48%, #d6dde7 100%);
-  --site-style-background-size: cover, 40px 40px, cover;
+    radial-gradient(ellipse 75% 55% at 20% 15%, rgba(241, 245, 249, 0.65), transparent 52%),
+    radial-gradient(ellipse 60% 50% at 85% 85%, rgba(148, 163, 184, 0.3), transparent 50%),
+    linear-gradient(150deg, #d0dae6 0%, #b9c8db 50%, #d4dce6 100%);
+  --site-style-background-size: cover, cover, cover;
   --site-style-background-position: center, center, center;
-  --site-style-background-repeat: no-repeat, repeat, no-repeat;
+  --site-style-background-repeat: no-repeat, no-repeat, no-repeat;
 }
 body.site-page[data-theme-background-priority="simple"][data-surface="paper"] {
   --site-style-background:
-    repeating-linear-gradient(0deg, rgba(90, 72, 54, 0.08) 0 1px, transparent 1px 8px),
-    linear-gradient(135deg, #d6c4a9 0%, #cbb79c 56%, #d8c9b2 100%);
-  --site-style-background-size: auto, cover;
-  --site-style-background-position: center, center;
-  --site-style-background-repeat: repeat, no-repeat;
+    radial-gradient(ellipse 70% 50% at 30% 10%, rgba(255, 252, 245, 0.7), transparent 55%),
+    radial-gradient(ellipse 50% 40% at 80% 90%, rgba(180, 150, 120, 0.18), transparent 50%),
+    linear-gradient(145deg, #e2d3bc 0%, #d2bfa4 48%, #e0d2bb 100%);
+  --site-style-background-size: cover, cover, cover;
+  --site-style-background-position: center, center, center;
+  --site-style-background-repeat: no-repeat, no-repeat, no-repeat;
 }
 body.site-page[data-theme-background-priority="simple"][data-surface="liquid"] {
+  /* 液态玻璃简洁底：清透水光 + 冷色焦散，避免粉紫脏色 */
   --site-style-background:
-    linear-gradient(115deg, rgba(255, 255, 255, 0.25), transparent 30%),
-    repeating-linear-gradient(135deg, rgba(30, 64, 175, 0.08) 0 1px, transparent 1px 52px),
-    linear-gradient(150deg, #bfd7ea 0%, #c9c9e6 34%, #d8b9d4 66%, #bdd3e6 100%);
-  --site-style-background-size: cover, 52px 52px, cover;
-  --site-style-background-position: center, center, center;
-  --site-style-background-repeat: no-repeat, repeat, no-repeat;
-}
-body.site-page[data-theme-background-priority="simple"][data-surface="liquid-lite"] {
-  --site-style-background:
-    linear-gradient(112deg, rgba(255, 255, 255, 0.22), transparent 30%),
-    repeating-linear-gradient(90deg, rgba(37, 99, 235, 0.08) 0 1px, transparent 1px 48px),
-    linear-gradient(145deg, #cedbea 0%, #b8c9dc 46%, #d7e0ea 100%);
-  --site-style-background-size: cover, 48px 48px, cover;
-  --site-style-background-position: center, center, center;
-  --site-style-background-repeat: no-repeat, repeat, no-repeat;
+    radial-gradient(ellipse 70% 55% at 18% 22%, rgba(255, 255, 255, 0.78), transparent 52%),
+    radial-gradient(ellipse 55% 48% at 78% 28%, rgba(125, 211, 252, 0.42), transparent 55%),
+    radial-gradient(ellipse 60% 50% at 55% 88%, rgba(56, 189, 248, 0.22), transparent 58%),
+    radial-gradient(ellipse 40% 35% at 42% 48%, rgba(186, 230, 253, 0.35), transparent 60%),
+    linear-gradient(155deg, #d6eaf8 0%, #b9d9ef 36%, #c5e0f2 62%, #e2f0fa 100%);
+  --site-style-background-size: cover, cover, cover, cover, cover;
+  --site-style-background-position: center, center, center, center, center;
+  --site-style-background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat;
 }
 body.site-page[data-theme-background-priority="simple"][data-surface="obsidian"] {
-  --background-dim: rgba(2, 6, 23, 0.1);
+  --background-dim: rgba(2, 6, 23, 0.08);
   --site-style-background:
-    radial-gradient(circle at 16% 12%, rgba(125, 142, 162, 0.22), transparent 32%),
-    radial-gradient(circle at 78% 82%, rgba(69, 85, 105, 0.2), transparent 34%),
-    linear-gradient(145deg, #313b48 0%, #222b36 48%, #151c25 100%);
+    radial-gradient(ellipse 50% 40% at 18% 14%, rgba(148, 163, 184, 0.22), transparent 55%),
+    radial-gradient(ellipse 45% 40% at 82% 86%, rgba(71, 85, 105, 0.28), transparent 50%),
+    linear-gradient(150deg, #2a3442 0%, #1a222d 48%, #0f141c 100%);
   --site-style-background-size: cover, cover, cover;
   --site-style-background-position: center, center, center;
   --site-style-background-repeat: no-repeat, no-repeat, no-repeat;
 }
 body.site-page[data-theme-background-priority="simple"][data-surface="neon"] {
-  --background-dim: rgba(2, 6, 23, 0.22);
+  --background-dim: rgba(2, 6, 23, 0.18);
   --site-style-background:
-    repeating-linear-gradient(135deg, rgba(5, 217, 232, 0.12) 0 2px, transparent 2px 22px),
-    linear-gradient(135deg, #080414 0%, #180824 48%, #020617 100%);
-  --site-style-background-size: 28px 28px, cover;
-  --site-style-background-position: center, center;
-  --site-style-background-repeat: repeat, no-repeat;
+    radial-gradient(ellipse 45% 40% at 22% 18%, rgba(236, 72, 153, 0.28), transparent 55%),
+    radial-gradient(ellipse 40% 35% at 78% 72%, rgba(34, 211, 238, 0.22), transparent 50%),
+    linear-gradient(145deg, #0a0618 0%, #160820 50%, #050614 100%);
+  --site-style-background-size: cover, cover, cover;
+  --site-style-background-position: center, center, center;
+  --site-style-background-repeat: no-repeat, no-repeat, no-repeat;
 }
 body.site-page[data-theme-background-priority="simple"][data-surface="pixel"] {
-  --background-dim: rgba(2, 6, 23, 0.08);
+  --background-dim: rgba(2, 6, 23, 0.06);
   --site-style-background:
-    linear-gradient(135deg, rgba(252, 211, 77, 0.1), rgba(26, 32, 48, 0) 42%),
-    repeating-linear-gradient(0deg, rgba(252, 211, 77, 0.12) 0 2px, transparent 2px 24px),
-    repeating-linear-gradient(90deg, rgba(252, 211, 77, 0.08) 0 2px, transparent 2px 24px),
-    linear-gradient(135deg, #1a2030 0%, #2a3340 100%);
-  --site-style-background-size: cover, 24px 24px, 24px 24px, cover;
-  --site-style-background-position: center, center, center, center;
-  --site-style-background-repeat: no-repeat, repeat, repeat, no-repeat;
+    radial-gradient(ellipse 40% 30% at 70% 20%, rgba(252, 211, 77, 0.16), transparent 50%),
+    linear-gradient(180deg, #141a28 0%, #1e2738 55%, #252f40 100%);
+  --site-style-background-size: cover, cover;
+  --site-style-background-position: center, center;
+  --site-style-background-repeat: no-repeat, no-repeat;
 }
 
-/* 通用渲染器：常规质感用伪层接管卡片底，不改变文字和图标。 */
+/* 通用渲染器：常规质感用伪层接管卡片底，不改变文字和图标。
+   .search-engine 必须保持 absolute 浮层定位：若写成 relative，会连同 top:60px
+   落入文档流并下移，错误遮盖下方网站卡片（glass/mica/paper/plain 等主题）。
+   absolute 本身已能作为 ::before 的定位包含块，只需 isolation。 */
 body.site-page[data-card-renderer="generic"][data-card-opacity="custom"] .nav-item,
 body.site-page[data-card-renderer="generic"][data-card-opacity="custom"] .nav-section-title,
 body.site-page[data-card-renderer="generic"][data-card-opacity="custom"] .bookmark-empty,
-body.site-page[data-card-renderer="generic"][data-card-opacity="custom"] .search-engine,
 body.site-page[data-card-renderer="generic"][data-card-opacity="custom"] .bookmark-info-panel {
   position: relative;
+  isolation: isolate;
+}
+body.site-page[data-card-renderer="generic"][data-card-opacity="custom"] .search-engine {
   isolation: isolate;
 }
 body.site-page[data-card-renderer="generic"][data-card-opacity="custom"] .nav-item > *,
@@ -2328,9 +2394,21 @@ body.site-page[data-text-contrast="off"][data-text-color-mode="default"][data-te
 
 /* 自定义文字主题色只在反色关闭时生效，避免与差值混合/采样反色同时改色。 */
 body.site-page[data-text-contrast="off"][data-text-color-mode="custom"] {
-  --custom-text-muted: color-mix(in srgb, var(--custom-text-color) 70%, var(--text-muted));
-  --custom-text-control: color-mix(in srgb, var(--custom-text-color) 86%, var(--header-text));
+  --title-color: var(--custom-text-color);
+  --text-muted: var(--custom-text-color);
+  --header-text: var(--custom-text-color);
+  --custom-text-muted: var(--custom-text-color);
+  --custom-text-control: var(--custom-text-color);
 }
+@supports (color: color-mix(in srgb, #000 50%, #fff)) {
+  body.site-page[data-text-contrast="off"][data-text-color-mode="custom"] {
+    --text-muted: color-mix(in srgb, var(--custom-text-color) 70%, var(--text-muted-base));
+    --header-text: color-mix(in srgb, var(--custom-text-color) 86%, var(--header-text-base));
+    --custom-text-muted: var(--text-muted);
+    --custom-text-control: var(--header-text);
+  }
+}
+body.site-page[data-text-contrast="off"][data-text-color-mode="custom"] .header .site,
 body.site-page[data-text-contrast="off"][data-text-color-mode="custom"] .nav-name,
 body.site-page[data-text-contrast="off"][data-text-color-mode="custom"] .nav-section-title {
   color: var(--custom-text-color);
@@ -2349,6 +2427,8 @@ body.site-page[data-text-contrast="off"][data-text-color-mode="custom"] .prefere
 body.site-page[data-text-contrast="off"][data-text-color-mode="custom"] .search-engine-option,
 body.site-page[data-text-contrast="off"][data-text-color-mode="custom"] .segmented-option,
 body.site-page[data-text-contrast="off"][data-text-color-mode="custom"] .text-color-default,
+body.site-page[data-text-contrast="off"][data-text-color-mode="custom"] .text-shadow-toggle,
+body.site-page[data-text-contrast="off"][data-text-color-mode="custom"] .text-bold-toggle,
 body.site-page[data-text-contrast="off"][data-text-color-mode="custom"] .text-color-input {
   color: var(--custom-text-control);
 }
