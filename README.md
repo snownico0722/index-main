@@ -1,4 +1,6 @@
-# 个人导航
+# 个人导航 / Personal Start Page
+
+**中文** · [English](#english)
 
 打开浏览器，就是你自己的起始页。
 
@@ -83,13 +85,115 @@ powershell -ExecutionPolicy Bypass -File .\book2html-server.ps1
 - **纯本地**：页面和设置都在你电脑上，不会上传到任何服务器
 - **换电脑**：把整个文件夹拷过去就能用；若要带上外观偏好，浏览器里该站点的本地数据不会自动跟着走，到新环境再调一次设置即可
 - **壁纸**：默认用 `images/beijing.jpg`，换成自己的图并保持文件名，或改代码里的引用路径
+- **滚动条**：整页用右侧悬浮滑块（不再露出 Windows 系统那条白底轨道），颜色会跟着壁纸/主题明暗自动适配；设置面板等内部区域则是细圆角透明轨道
 - **液态玻璃**：建议用 Chrome / Edge 等 Chromium 内核浏览器，效果更完整
 
 ## 相关链接
 
-- 主项目：https://github.com/testsnow0722/index-main
-- Book2HTML：https://github.com/testsnow0722/Bookmarks-to-html
+- 主项目：https://github.com/snownico0722/index-main
+- Book2HTML：https://github.com/snownico0722/Bookmarks-to-html
 
 ## 致谢
 
 - 磨砂纸纹理 `images/paper-texture.png` 来自 [transparenttextures.com](https://www.transparenttextures.com/)，作者 Atle Mo，许可 CC BY-SA 3.0
+
+---
+
+<a id="english"></a>
+
+# Personal Start Page
+
+**English** · [中文](#个人导航--personal-start-page)
+
+Open the browser, and you’re on a homepage you actually own.
+
+No signup, no server, no dependency maze — double-click `index.html` and go. Sites, search engines, and look-and-feel stay under your control.
+
+![Theme switching demo](screenshots/Styles.gif)
+
+## Who it’s for
+
+- You want common sites on one page instead of hunting the bookmarks bar
+- You want a nicer start page without locking into an online navigation service
+- You want Chrome / Edge favorites turned into a matching static page
+
+## Quick start
+
+1. Open the project folder
+2. Double-click `index.html` (or open it in a browser)
+3. Use the gear (top-right) for appearance; edit navigation in `js/site-data.js`
+
+That’s daily use. Close and reopen the browser — preferences stay on this machine.
+
+## What you can tweak
+
+Most options live in the settings panel:
+
+| Control | What it does |
+| --- | --- |
+| Light / dark | Overall brightness |
+| Material | Frosted glass, liquid glass, acrylic, mica, paper, obsidian, neon, pixel… |
+| Density | Comfortable or compact (compact helps on small screens) |
+| Wallpaper | Background blur, prefer theme wallpapers, etc. |
+| Cards | Brightness & opacity — text and icons stay crisp |
+| Text | Color, brightness, shadow, bold, and invert for readability |
+
+Default: light + frosted glass. Change anytime; choices are remembered locally.
+
+### Materials at a glance
+
+- **Frosted glass** — safe default
+- **Liquid glass** — closer to iOS-style glass (best on Chromium)
+- **Acrylic / mica** — thicker frost, or let wallpaper warmth show through
+- **Paper** — real paper texture
+- **Obsidian** — deep black with cool edges
+- **Cyber neon / 8-bit pixel** — mood switches
+
+## Home search
+
+The center search box can switch engines (Baidu, Google, Bing, …) via the icon on the left. Press Enter or click Search.
+
+## Edit the site list
+
+Groups and links live in:
+
+```text
+js/site-data.js
+```
+
+Open it in any editor and add/remove categories and sites using the existing format. Put icons under `images/` and keep paths correct.
+
+`common.html`, `develop.html`, `tools.html`, and similar files are extra pages; the top nav follows the data.
+
+## Bookmarks → navigation page
+
+Use bundled **Book2HTML** instead of copying bookmarks by hand:
+
+1. Go into the `book2html` folder
+2. Open a terminal there
+3. Run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\book2html-server.ps1
+```
+
+A local tool opens in the browser, scans Chrome / Edge / Brave favorites, and can export matching `bookmarks_xxx.html` pages (optionally into the top nav).
+
+Details: [book2html/README.md](book2html/README.md).
+
+## Tips
+
+- **Local-only**: pages and settings stay on your machine; nothing is uploaded
+- **Another PC**: copy the whole folder; appearance prefs live in browser storage, so re-tune once on the new machine if needed
+- **Wallpaper**: default is `images/beijing.jpg` — replace the file or update the path in code
+- **Scrollbar**: the page uses a floating right-edge thumb (no Windows white system track); colors adapt to wallpaper/theme luminance. Inner panels keep thin rounded bars with transparent tracks
+- **Liquid glass**: Chrome / Edge (Chromium) give the fullest effect
+
+## Links
+
+- Main project: https://github.com/snownico0722/index-main
+- Book2HTML: https://github.com/snownico0722/Bookmarks-to-html
+
+## Credits
+
+- Paper texture `images/paper-texture.png` from [transparenttextures.com](https://www.transparenttextures.com/) by Atle Mo, CC BY-SA 3.0

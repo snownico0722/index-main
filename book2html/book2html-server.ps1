@@ -1201,8 +1201,38 @@ function Get-AppHtml {
       --danger: #b42318;
       --success: #087443;
       --shadow: 0 14px 36px rgba(23, 32, 51, 0.08);
+      --scrollbar-size: 8px;
+      --scrollbar-thumb: color-mix(in srgb, var(--muted) 48%, transparent);
+      --scrollbar-thumb-hover: color-mix(in srgb, var(--accent) 62%, var(--muted));
+      --scrollbar-thumb-active: var(--accent);
     }
     * { box-sizing: border-box; }
+    /* 自绘滚动条：细圆角、透明轨道 */
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--scrollbar-thumb) transparent;
+    }
+    *::-webkit-scrollbar {
+      width: var(--scrollbar-size);
+      height: var(--scrollbar-size);
+    }
+    *::-webkit-scrollbar-track { background: transparent; }
+    *::-webkit-scrollbar-thumb {
+      background-color: var(--scrollbar-thumb);
+      border-radius: 999px;
+      border: 2px solid transparent;
+      background-clip: padding-box;
+      min-height: 36px;
+      min-width: 36px;
+    }
+    *::-webkit-scrollbar-thumb:hover {
+      background-color: var(--scrollbar-thumb-hover);
+      border-width: 1px;
+    }
+    *::-webkit-scrollbar-thumb:active {
+      background-color: var(--scrollbar-thumb-active);
+    }
+    *::-webkit-scrollbar-corner { background: transparent; }
     body {
       margin: 0;
       background: var(--bg);

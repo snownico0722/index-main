@@ -1564,4 +1564,365 @@
 
   applyPreferences();
   renderPreferencePanel();
+
+  /* 整页悬浮滚动条：隐藏系统白底槽；轨道整条一次平均明度取反 */
+  const initSiteScrollbar = () => {
+    if (!document.body?.classList.contains("site-page")) {
+      return;
+    }
+
+    if (document.querySelector(".site-scrollbar")) {
+      return;
+    }
+
+    const rail = document.createElement("div");
+    const thumb = document.createElement("div");
+    rail.className = "site-scrollbar";
+    rail.hidden = true;
+    rail.setAttribute("aria-hidden", "true");
+    thumb.className = "site-scrollbar__thumb";
+    rail.append(thumb);
+    document.body.append(rail);
+
+    let dragging = false;
+    let dragOffsetY = 0;
+    let rafId = 0;
+    let trackRafId = 0;
+    let trackRequestId = 0;
+    const imageCache = new Map();
+
+    const getScrollMetrics = () => {
+      const root = document.documentElement;
+      const scrollTop = root.scrollTop || document.body.scrollTop || 0;
+      const scrollHeight = Math.max(root.scrollHeight, document.body.scrollHeight);
+      const clientHeight = root.clientHeight || window.innerHeight || 0;
+      return { scrollTop, scrollHeight, clientHeight, maxScroll: scrollHeight - clientHeight };
+    };
+
+    const parseCssUrl = (value) => {
+      const match = String(value || "").match(/url\(\s*(['"]?)(.*?)\1\s*\)/i);
+      if (!match) {
+        return null;
+      }
+      const raw = match[2].trim();
+      return raw && raw !== "none" ? raw : null;
+    };
+
+    const relativeLuma = (r, g, b) => (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+
+    const loadImage = (src) => {
+      const cached = imageCache.get(src);
+      if (cached) {
+        return cached;
+      }
+
+      const promise = new Promise((resolve, reject) => {
+        const image = new Image();
+        image.decoding = "async";
+        image.onload = () => resolve(image);
+        image.onerror = () => reject(new Error("bg image load failed"));
+        image.src = src;
+      });
+      imageCache.set(src, promise);
+      return promise;
+    };
+
+    const colorToRgb = (color) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1;
+      canvas.height = 1;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) {
+        return [128, 128, 128];
+      }
+      ctx.fillStyle = "#808080";
+      ctx.fillStyle = color || "#808080";
+      ctx.fillRect(0, 0, 1, 1);
+      const data = ctx.getImageData(0, 0, 1, 1).data;
+      return [data[0], data[1], data[2]];
+    };
+
+    const drawCover = (ctx, image, width, height) => {
+      const imageRatio = image.naturalWidth / Math.max(1, image.naturalHeight);
+      const viewRatio = width / Math.max(1, height);
+      let drawWidth;
+      let drawHeight;
+      let offsetX;
+      let offsetY;
+
+      if (imageRatio > viewRatio) {
+        drawHeight = height;
+        drawWidth = height * imageRatio;
+        offsetX = (width - drawWidth) / 2;
+        offsetY = 0;
+      } else {
+        drawWidth = width;
+        drawHeight = width / imageRatio;
+        offsetX = 0;
+        offsetY = (height - drawHeight) / 2;
+      }
+
+      ctx.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
+    };
+
+    const applyTrackAndThumbLuma = (luma) => {
+      const clamp01 = (value) => Math.min(1, Math.max(0, value));
+      const source = clamp01(luma);
+      const toGray = (value) => Math.round(clamp01(value) * 255);
+      const toRgba = (value, alpha) => {
+        const gray = toGray(value);
+        return `rgba(${gray}, ${gray}, ${gray}, ${alpha})`;
+      };
+
+      // 衬底：整条平均明度，不取反；半透明留出层次
+      const trackSolid = toRgba(source, 0.40);
+
+      // 滑块：取反，但压缩到中间带，避免死黑/死白，给激发态留上下空间
+      const pureInvert = 1 - source;
+      const invertMin = 0.18;
+      const invertMax = 0.78;
+      const baseLuma = invertMin + pureInvert * (invertMax - invertMin);
+
+      // 激发：向更「取反」方向推进，同时抬透明度；仍钳在安全区
+      const exciteLuma = (amount) => {
+        const pushed = baseLuma + (pureInvert - baseLuma) * amount;
+        return clamp01(Math.min(0.88, Math.max(0.12, pushed)));
+      };
+
+      // 常态 → 悬停 → 按下：明度与透明度都有余量
+      const thumbSolid = toRgba(exciteLuma(0), 0.68);
+      const thumbHover = toRgba(exciteLuma(0.42), 0.82);
+      const thumbActive = toRgba(exciteLuma(0.72), 0.92);
+
+      rail.style.setProperty("--scrollbar-track-solid", trackSolid);
+      rail.style.setProperty("--scrollbar-thumb", thumbSolid);
+      rail.style.setProperty("--scrollbar-thumb-hover", thumbHover);
+      rail.style.setProperty("--scrollbar-thumb-active", thumbActive);
+      rail.style.background = trackSolid;
+    };
+
+    const updateTrackLuminance = async () => {
+      const requestId = ++trackRequestId;
+      if (rail.hidden) {
+        return;
+      }
+
+      const rect = rail.getBoundingClientRect();
+      if (rect.width < 1 || rect.height < 1) {
+        return;
+      }
+
+      const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 1;
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 1;
+      const bodyStyle = getComputedStyle(document.body);
+      const pageBg = bodyStyle.backgroundColor || "#f6f8f9";
+      const fallbackLuma = relativeLuma(...colorToRgb(pageBg));
+
+      try {
+        // 低分辨率绘制整页背景，再把滚动条整条区域压成 1×1 → 一次平均明度
+        const scale = 0.2;
+        const fullWidth = Math.max(1, Math.round(viewportWidth * scale));
+        const fullHeight = Math.max(1, Math.round(viewportHeight * scale));
+        const full = document.createElement("canvas");
+        full.width = fullWidth;
+        full.height = fullHeight;
+        const fullCtx = full.getContext("2d", { willReadFrequently: true, alpha: true });
+        if (!fullCtx) {
+          applyTrackAndThumbLuma(fallbackLuma);
+          return;
+        }
+
+        fullCtx.fillStyle = pageBg;
+        fullCtx.fillRect(0, 0, fullWidth, fullHeight);
+
+        const backgroundUrl = parseCssUrl(bodyStyle.getPropertyValue("--site-background-image"));
+        if (backgroundUrl) {
+          const image = await loadImage(backgroundUrl);
+          if (requestId !== trackRequestId) {
+            return;
+          }
+          drawCover(fullCtx, image, fullWidth, fullHeight);
+        }
+
+        const dim = bodyStyle.getPropertyValue("--background-dim").trim();
+        if (dim && dim !== "transparent") {
+          fullCtx.fillStyle = dim;
+          fullCtx.fillRect(0, 0, fullWidth, fullHeight);
+        }
+
+        const stripX = Math.min(fullWidth - 1, Math.max(0, Math.round(rect.left * scale)));
+        const stripY = Math.min(fullHeight - 1, Math.max(0, Math.round(rect.top * scale)));
+        const stripW = Math.max(1, Math.min(fullWidth - stripX, Math.round(rect.width * scale)));
+        const stripH = Math.max(1, Math.min(fullHeight - stripY, Math.round(rect.height * scale)));
+
+        const average = document.createElement("canvas");
+        average.width = 1;
+        average.height = 1;
+        const averageCtx = average.getContext("2d", { willReadFrequently: true });
+        if (!averageCtx) {
+          applyTrackAndThumbLuma(fallbackLuma);
+          return;
+        }
+
+        // 整条 strip 一次缩到 1px：得到唯一平均明度
+        averageCtx.drawImage(full, stripX, stripY, stripW, stripH, 0, 0, 1, 1);
+        const pixel = averageCtx.getImageData(0, 0, 1, 1).data;
+        if (requestId !== trackRequestId) {
+          return;
+        }
+        applyTrackAndThumbLuma(relativeLuma(pixel[0], pixel[1], pixel[2]));
+      } catch (error) {
+        if (requestId === trackRequestId) {
+          applyTrackAndThumbLuma(fallbackLuma);
+        }
+      }
+    };
+
+    const scheduleTrackUpdate = () => {
+      if (trackRafId) {
+        return;
+      }
+      trackRafId = window.requestAnimationFrame(() => {
+        trackRafId = 0;
+        updateTrackLuminance();
+      });
+    };
+
+    const updateThumb = () => {
+      rafId = 0;
+      const { scrollTop, scrollHeight, clientHeight, maxScroll } = getScrollMetrics();
+
+      if (maxScroll <= 1) {
+        rail.hidden = true;
+        rail.classList.remove("is-dragging");
+        return;
+      }
+
+      const wasHidden = rail.hidden;
+      rail.hidden = false;
+      const trackHeight = rail.clientHeight || clientHeight;
+      const thumbHeight = Math.max(32, Math.round((clientHeight / scrollHeight) * trackHeight));
+      const maxThumbTop = Math.max(0, trackHeight - thumbHeight);
+      const thumbTop = maxScroll > 0 ? (scrollTop / maxScroll) * maxThumbTop : 0;
+
+      thumb.style.height = `${thumbHeight}px`;
+      thumb.style.transform = `translateY(${thumbTop}px)`;
+
+      if (wasHidden) {
+        scheduleTrackUpdate();
+      }
+    };
+
+    const scheduleUpdate = () => {
+      if (rafId) {
+        return;
+      }
+      rafId = window.requestAnimationFrame(updateThumb);
+    };
+
+    const scrollToThumbTop = (thumbTop) => {
+      const { clientHeight, maxScroll } = getScrollMetrics();
+      if (maxScroll <= 0) {
+        return;
+      }
+
+      const trackHeight = rail.clientHeight || clientHeight;
+      const thumbHeight = thumb.offsetHeight || 32;
+      const maxThumbTop = Math.max(0, trackHeight - thumbHeight);
+      const ratio = maxThumbTop > 0 ? Math.min(1, Math.max(0, thumbTop / maxThumbTop)) : 0;
+      const nextTop = ratio * maxScroll;
+      document.documentElement.scrollTop = nextTop;
+      document.body.scrollTop = nextTop;
+    };
+
+    thumb.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) {
+        return;
+      }
+
+      dragging = true;
+      rail.classList.add("is-dragging");
+
+      const thumbRect = thumb.getBoundingClientRect();
+      dragOffsetY = event.clientY - thumbRect.top;
+      thumb.setPointerCapture(event.pointerId);
+      event.preventDefault();
+    });
+
+    thumb.addEventListener("pointermove", (event) => {
+      if (!dragging) {
+        return;
+      }
+
+      const railRect = rail.getBoundingClientRect();
+      const thumbHeight = thumb.offsetHeight || 32;
+      const rawTop = event.clientY - railRect.top - dragOffsetY;
+      const maxThumbTop = Math.max(0, railRect.height - thumbHeight);
+      scrollToThumbTop(Math.min(maxThumbTop, Math.max(0, rawTop)));
+      updateThumb();
+    });
+
+    const endDrag = (event) => {
+      if (!dragging) {
+        return;
+      }
+
+      dragging = false;
+      rail.classList.remove("is-dragging");
+      try {
+        thumb.releasePointerCapture(event.pointerId);
+      } catch (error) {
+        // ignore
+      }
+    };
+
+    thumb.addEventListener("pointerup", endDrag);
+    thumb.addEventListener("pointercancel", endDrag);
+
+    rail.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0 || event.target === thumb) {
+        return;
+      }
+
+      const railRect = rail.getBoundingClientRect();
+      const thumbHeight = thumb.offsetHeight || 32;
+      scrollToThumbTop(event.clientY - railRect.top - thumbHeight / 2);
+      updateThumb();
+    });
+
+    window.addEventListener("scroll", scheduleUpdate, { passive: true });
+    window.addEventListener("resize", () => {
+      scheduleUpdate();
+      scheduleTrackUpdate();
+    });
+    window.addEventListener("load", () => {
+      scheduleUpdate();
+      scheduleTrackUpdate();
+    }, { once: true });
+
+    if (typeof ResizeObserver === "function") {
+      new ResizeObserver(() => {
+        scheduleUpdate();
+        scheduleTrackUpdate();
+      }).observe(document.documentElement);
+      new ResizeObserver(scheduleUpdate).observe(document.body);
+    }
+
+    // 主题 / 壁纸变化时重新整条取明度
+    new MutationObserver(scheduleTrackUpdate).observe(document.body, {
+      attributes: true,
+      attributeFilter: [
+        "data-theme",
+        "data-surface",
+        "data-theme-background-priority",
+        "style",
+        "class"
+      ]
+    });
+
+    scheduleUpdate();
+    scheduleTrackUpdate();
+  };
+
+  initSiteScrollbar();
 })();

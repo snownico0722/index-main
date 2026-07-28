@@ -8,10 +8,11 @@
  *   4. 内容区（nav-list / nav-item / nav-section-title）
  *   5. 搜索区与搜索引擎面板
  *   6. 偏好面板（segmented-control）
- *   7. 主题变量（theme / surface / density）
- *   8. 主题与质感重载
- *   9. 密度调整
- *   10. 响应式
+ *   7. 自绘滚动条
+ *   8. 主题变量（theme / surface / density）
+ *   9. 主题与质感重载
+ *   10. 密度调整
+ *   11. 响应式
  * ========================================================================= */
 
 /* ---------- 1. 文档基础与排版 ---------- */
@@ -1063,7 +1064,151 @@ input::-webkit-input-placeholder {
     0 0 0 5px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
-/* ---------- 7. 主题变量（默认 = 浅色 + 毛玻璃 + 宽松） ---------- */
+/* ---------- 7. 自绘滚动条 ----------
+ * 整页：隐藏系统滚动条（Windows 会强制白底轨道），改用右侧悬浮滑块 .site-scrollbar。
+ * 内部容器：仍用 CSS 细滑块，轨道强制透明、无白底。
+ */
+body.site-page {
+  --scrollbar-size: 10px;
+  /* 滑块中性加深；轨道由 JS 对整条背后做一次平均明度取反后写入 --scrollbar-track-solid */
+  --scrollbar-thumb: color-mix(in srgb, var(--header-text, #333) 72%, transparent);
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--header-text, #333) 86%, transparent);
+  --scrollbar-thumb-active: color-mix(in srgb, var(--header-text, #333) 96%, transparent);
+  --scrollbar-track-solid: color-mix(in srgb, var(--header-text, #333) 14%, transparent);
+}
+
+body.site-page[data-theme="dark"] {
+  --scrollbar-thumb: color-mix(in srgb, var(--header-text, #e2e8f0) 70%, transparent);
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--header-text, #e2e8f0) 84%, transparent);
+  --scrollbar-thumb-active: color-mix(in srgb, #fff 92%, transparent);
+  --scrollbar-track-solid: color-mix(in srgb, #000 28%, transparent);
+}
+
+/* 整页：彻底去掉系统滚动条及其白底槽 */
+html:has(body.site-page) {
+  scrollbar-width: none;
+}
+html:has(body.site-page)::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none;
+  background: transparent;
+}
+
+/* 内部可滚动区：细滑块 + 全透明轨道（含 scrollbar 本体，避免 WebKit 白底） */
+body.site-page * {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+body.site-page *::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+  background: transparent;
+  background-color: transparent;
+}
+
+body.site-page *::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+  background: transparent;
+}
+
+body.site-page *::-webkit-scrollbar-track,
+body.site-page *::-webkit-scrollbar-track-piece {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none;
+  box-shadow: none;
+}
+
+body.site-page *::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  box-shadow: none;
+  min-height: 36px;
+  min-width: 36px;
+}
+
+body.site-page *::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
+  border-width: 1px;
+}
+
+body.site-page *::-webkit-scrollbar-thumb:active {
+  background-color: var(--scrollbar-thumb-active);
+  border-width: 1px;
+}
+
+body.site-page *::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* 整页悬浮滑块：常显、无发光。
+ * 轨道：整条平均明度（不取反）。
+ * 滑块：取反但压缩明度带 + 透明度阶梯，给悬停/按下激发态留空间，避免死黑。
+ */
+.site-scrollbar {
+  position: fixed;
+  top: 8px;
+  right: 3px;
+  bottom: 8px;
+  width: 12px;
+  z-index: 40;
+  pointer-events: auto;
+  opacity: 1;
+  border-radius: 999px;
+  background: var(--scrollbar-track-solid, color-mix(in srgb, #333 14%, transparent));
+  overflow: hidden;
+  transition: background-color 0.2s ease;
+}
+.site-scrollbar[hidden] {
+  display: none !important;
+}
+.site-scrollbar__thumb {
+  position: absolute;
+  top: 0;
+  left: 2px;
+  right: 2px;
+  z-index: 1;
+  width: auto;
+  min-height: 36px;
+  border-radius: 999px;
+  border: 0;
+  pointer-events: auto;
+  cursor: grab;
+  background: var(--scrollbar-thumb, color-mix(in srgb, #333 72%, transparent));
+  box-shadow: none;
+  transition: background-color 0.16s ease;
+  touch-action: none;
+  will-change: transform, height;
+  box-sizing: border-box;
+}
+.site-scrollbar__thumb:hover {
+  background: var(--scrollbar-thumb-hover, color-mix(in srgb, #333 86%, transparent));
+}
+.site-scrollbar.is-dragging .site-scrollbar__thumb,
+.site-scrollbar__thumb:active {
+  background: var(--scrollbar-thumb-active, color-mix(in srgb, #333 96%, transparent));
+  cursor: grabbing;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-scrollbar,
+  .site-scrollbar__thumb {
+    transition: none;
+  }
+}
+
+/* 设置面板：略加宽，小浮层更好拖 */
+body.site-page .preference-panel {
+  --scrollbar-size: 9px;
+}
+
+/* ---------- 8. 主题变量（默认 = 浅色 + 毛玻璃 + 宽松） ---------- */
 body.site-page {
   --page-bg: rgb(246, 248, 249);
   --background-dim: transparent;
@@ -1173,7 +1318,7 @@ body.site-page[data-card-opacity-direction="stacked"] {
   --header-opacity-target: var(--header-stacked-bg);
 }
 
-/* ---------- 8. 主题与质感重载 ---------- */
+/* ---------- 9. 主题与质感重载 ---------- */
 /* 深色主题 */
 body.site-page[data-theme="dark"] {
   --page-bg: #0f172a;
@@ -2077,7 +2222,7 @@ body.site-page .search-engine-option:focus-visible {
   background: var(--control-active-bg);
 }
 
-/* ---------- 9. 密度（紧凑） ---------- */
+/* ---------- 10. 密度（紧凑） ---------- */
 body.site-page[data-density="compact"] #content-wrapper {
   margin-top: 68px;
 }
@@ -2125,7 +2270,7 @@ body.site-page[data-density="compact"] .nav-item.has-description .nav-img {
   margin-bottom: 28px;
 }
 
-/* ---------- 10. 响应式 ---------- */
+/* ---------- 11. 响应式 ---------- */
 @media only screen and (min-width: 1200px) {
   .container { width: 1100px; }
   #main-content { width: 750px; }
