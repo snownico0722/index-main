@@ -93,10 +93,6 @@ powershell -ExecutionPolicy Bypass -File .\book2html-server.ps1
 - 主项目：https://github.com/snownico0722/index-main
 - Book2HTML：https://github.com/snownico0722/Bookmarks-to-html
 
-## 致谢
-
-- 磨砂纸纹理 `images/paper-texture.png` 来自 [transparenttextures.com](https://www.transparenttextures.com/)，作者 Atle Mo，许可 CC BY-SA 3.0
-
 ---
 
 <a id="english"></a>
@@ -194,6 +190,3 @@ Details: [book2html/README.md](book2html/README.md).
 - Main project: https://github.com/snownico0722/index-main
 - Book2HTML: https://github.com/snownico0722/Bookmarks-to-html
 
-## Credits
-
-- Paper texture `images/paper-texture.png` from [transparenttextures.com](https://www.transparenttextures.com/) by Atle Mo, CC BY-SA 3.0
