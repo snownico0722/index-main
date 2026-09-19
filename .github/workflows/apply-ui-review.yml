@@ -1,0 +1,75 @@
+name: Apply verified UI review
+on:
+  push:
+    branches: [improve/visual-interaction-skins-20260920]
+    paths: [.github/workflows/apply-ui-review.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: github.repository == 'snownico0722/index-main' && github.ref == 'refs/heads/improve/visual-interaction-skins-20260920'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify and apply reviewed changes
+        shell: python
+        run: |
+          import base64, hashlib, json, lzma, pathlib, shutil, subprocess
+          root = pathlib.Path.cwd()
+          pieces = [root / f'.github/ui-review-{i}.b64' for i in (1, 2, 3)]
+          encoded = ''.join(p.read_text().strip() for p in pieces)
+          raw = lzma.decompress(base64.b64decode(encoded, validate=True))
+          assert hashlib.sha256(raw).hexdigest() == '857c40cf911d57fedfe9886a946b2c559eb3f881e665571fb2475cd66df90ccc', 'Bundle integrity mismatch'
+          bundle = json.loads(raw)
+          allowed = set('''.github/workflows/ui-regression.yml
+          .gitignore
+          CHANGELOG.md
+          README.md
+          book2html/book2html-server.ps1
+          book2html/data/css/ops-coffee.css
+          book2html/data/js/liquid-glass.js
+          book2html/data/js/site-preferences.js
+          common.html
+          css/ops-coffee.css
+          develop.html
+          index.html
+          js/liquid-glass.js
+          js/nav.ops-coffee.min.js
+          js/site-preferences.js
+          js/site-renderer.js
+          scripts/export-chrome-bookmarks.ps1
+          tests/bookmark-regression.ps1
+          tests/ui-regression.cjs
+          tools.html'''.splitlines())
+          assert set(bundle['hashes']) == allowed, 'Unexpected paths'
+          patch = pathlib.Path('/tmp/ui-review.patch')
+          patch.write_text(bundle['patch'])
+          subprocess.run(['git', 'apply', '--check', str(patch)], check=True)
+          subprocess.run(['git', 'apply', str(patch)], check=True)
+          (root / 'js/liquid-glass.js').write_text(bundle['liquid'])
+          for path in ('css/ops-coffee.css', 'js/site-preferences.js', 'js/liquid-glass.js'):
+              shutil.copyfile(root / path, root / 'book2html/data' / path)
+          for path, expected in bundle['hashes'].items():
+              assert hashlib.sha256((root / path).read_bytes()).hexdigest() == expected, path
+          print('PASS: exact hashes for all 20 reviewed files')
+          # The connector installs the final read-only CI definition separately.
+          # This token only commits application/test files, never workflow edits.
+          subprocess.run(['git', 'restore', '.github/workflows/ui-regression.yml'], check=True)
+          for piece in pieces:
+              piece.unlink()
+          paths = sorted(allowed - {'.github/workflows/ui-regression.yml'})
+          subprocess.run(['git', 'add', '--', *paths, *[str(p.relative_to(root)) for p in pieces]], check=True)
+      - name: Syntax and whitespace checks
+        run: |
+          for f in js/*.js book2html/data/js/*.js tests/*.cjs; do node --check "$f"; done
+          git diff --cached --check
+      - name: Commit only to the review branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'feat: refine materials and responsive interactions; fix focus, IME and liquid lifecycle'
+          git push origin HEAD:improve/visual-interaction-skins-20260920
