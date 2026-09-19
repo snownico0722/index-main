@@ -1,101 +1,51 @@
 /**
- * Liquid Glass — per-element physics displacement map.
- *
- * 思路：
- *   1. 每个可悬停容器单独算一张 displacement map（按它自身宽×高×圆角×bezel）。
- *      算法：圆角矩形里，离边缘 d 像素以内的像素，沿"内法线"方向给一个位移
- *      magnitude = (1 - d/bezel)^1.5；中心区位移 = 0。
- *      → 视觉上是"边缘折射环 + 中心几乎不变形"，模拟厚玻璃透镜。
- *   2. 把 RGBA 写到 canvas，toDataURL，喂给 SVG <feImage> → <feDisplacementMap>。
- *   3. 每个元素一份 <filter>，inline backdrop-filter 指向自己的 filter id。
- *   4. hover 时 rAF 缓动 feDisplacementMap@scale，从 base 推高到 hover。
- *      其他元素完全不动。
- *   5. 同尺寸+同形状 cache：dataURL 复用，避免重复生成。
- *   6. ResizeObserver 监听尺寸变化（debounced），必要时重生成。
- *
- * 兼容性：仅 Chromium 系。其他浏览器 data-liquid-glass-supported="false"，
- * CSS 自动回退到无折射的伪液态玻璃。
+ * Static edge refraction for Chromium. Other engines retain the CSS glass fallback.
+ * Work is demand-driven: no canvas/worker/SVG allocation outside the liquid skin.
+ * Only near-viewport surfaces get filters; nested settings controls use CSS instead.
  */
 (() => {
-  const SVG_NS = "http://www.w3.org/2000/svg";
-
-  // 每种容器的形状参数（圆角、bezel 宽度——bezel 越宽折射环越厚）
-  // 注意：.header 故意不在这里。给 header 加 backdrop-filter 会让它成为
-  // 子节点 .preference-panel 的合成层父级，触发 Chromium 嵌套 backdrop-filter
-  // 的 bug（panel 采样不到真实背景）。顶栏的玻璃感由半透明背景 + 颜色变量提供。
-  const SHAPE_CONFIG = [
-    { selector: ".nav-item",         radius: 15, bezel: 18, hoverBoost: 1.7 },
-    { selector: ".nav-section-title",radius: 10, bezel: 12, hoverBoost: 1.25 },
-    { selector: ".preference-toggle",radius: 10, bezel: 12, hoverBoost: 1.5 },
-    { selector: ".segmented-control",radius: 8,  bezel: 10, hoverBoost: 1.4 },
-    { selector: ".search-box",       radius: 10, bezel: 16, hoverBoost: 1.5 },
-    { selector: ".search-engine",    radius: 5,  bezel: 14, hoverBoost: 1.3 },
-    { selector: ".preference-panel", radius: 10, bezel: 14, hoverBoost: 1.3 }
-  ];
-  const HOVER_SELECTOR = SHAPE_CONFIG.map((c) => c.selector).join(", ");
-  const EASE_HALF_LIFE = 0.09; // 秒
-
-  const probeSupport = () => {
-    if (typeof CSS === "undefined" || !CSS.supports) return false;
-    const hasBackdrop =
-      CSS.supports("backdrop-filter", "blur(1px)") ||
-      CSS.supports("-webkit-backdrop-filter", "blur(1px)");
-    if (!hasBackdrop) return false;
-    return (
-      CSS.supports("backdrop-filter", "url(#x)") ||
-      CSS.supports("-webkit-backdrop-filter", "url(#x)")
-    );
-  };
-
-  // ---- displacement map 生成 ----
-  // 位移图按短边上限降采样，feImage 仍按元素全尺寸拉伸，避免大卡 1:1 像素图拖垮主线程。
-  const MAP_MAX_EDGE = 256;
-  const VIEW_MARGIN = 240;
-  const dataUrlCache = new Map();
-  const pendingWarmups = new Map();
-  let warmupWorker = null;
-  let warmupWorkerUrl = "";
-  let warmupWorkerBroken = false;
-  let warmupWorkerSeq = 0;
-
-  const normalizeMapParams = (width, height, radius, bezel) => {
-    const fullW = Math.max(2, Math.round(width));
-    const fullH = Math.max(2, Math.round(height));
-    const scale = Math.min(1, MAP_MAX_EDGE / Math.max(fullW, fullH));
-    const w = Math.max(2, Math.round(fullW * scale));
-    const h = Math.max(2, Math.round(fullH * scale));
-    // bezel / radius 随降采样等比缩小，不能超过短边的一半
-    const halfShort = Math.floor(Math.min(w, h) / 2);
-    const r = Math.min(Math.max(0, Math.round(radius * scale)), halfShort);
-    const b = Math.min(Math.max(1, Math.round(bezel * scale)), halfShort);
-
-    return {
-      w,
-      h,
-      r,
-      b,
-      fullW,
-      fullH,
-      cacheKey: `${w}x${h}r${r}b${b}`
-    };
-  };
-
-  const isNearViewport = (el) => {
+  const NS = "http://www.w3.org/2000/svg";
+  const SELECTOR = ".nav-item, .search-box, .search-engine, .preference-panel";
+  const MARGIN = 160;
+  const MAX_CACHE = 64;
+  const maps = new Map(); // data URLs, no Blob URL lifetime or worker to leak
+  const entries = new Map();
+  const pending = new Set();
+  let svg, defs, frame = 0, sequence = 0, failed = false;
+  const supports = typeof CSS !== "undefined" && CSS.supports("backdrop-filter", "url(#x)") &&
+    /(?:Chrome|Chromium|Edg)\//.test(navigator.userAgent);
+  document.documentElement.dataset.liquidGlassSupported = String(supports);
+  if (!supports) return;
+  const active = () => document.body.dataset.surface === "liquid" && !document.hidden && !failed;
+  const near = (el) => {
+    if (!el.isConnected || el.closest("[hidden]")) return false;
     const rect = el.getBoundingClientRect();
-    const vh = window.innerHeight || document.documentElement.clientHeight || 0;
-    const vw = window.innerWidth || document.documentElement.clientWidth || 0;
-    return (
-      rect.bottom > -VIEW_MARGIN &&
-      rect.top < vh + VIEW_MARGIN &&
-      rect.right > -VIEW_MARGIN &&
-      rect.left < vw + VIEW_MARGIN
-    );
+    return rect.width > 3 && rect.height > 3 && rect.bottom > -MARGIN &&
+      rect.top < innerHeight + MARGIN && rect.right > -MARGIN && rect.left < innerWidth + MARGIN;
   };
-
-  // 浮层 / 常驻控件始终即时 setup；大量 .nav-item 可按可视区懒加载
-  const isEagerElement = (el) =>
-    el.matches(".search-box, .search-engine, .preference-panel, .preference-toggle, .segmented-control");
-
+  const release = (el) => {
+    const entry = entries.get(el);
+    if (!entry) return;
+    entry.filter.remove();
+    el.style.removeProperty("backdrop-filter");
+    el.style.removeProperty("-webkit-backdrop-filter");
+    delete el.dataset.liquidReady;
+    entries.delete(el);
+  };
+  const reset = () => {
+    cancelAnimationFrame(frame);
+    frame = 0;
+    pending.clear();
+    [...entries.keys()].forEach(release);
+    svg?.remove();
+    svg = defs = null;
+    maps.clear();
+  };
+  const createSvg = (tag, attributes = {}) => {
+    const node = document.createElementNS(NS, tag);
+    Object.entries(attributes).forEach(([key, value]) => node.setAttribute(key, String(value)));
+    return node;
+  };
   const fillDisplacementData = (data, w, h, r, b) => {
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
@@ -173,554 +123,140 @@
     }
   };
 
-  const createWarmupWorkerSource = () => `
-    const fillDisplacementData = ${fillDisplacementData.toString()};
-
-    self.onmessage = async (event) => {
-      const { id, cacheKey, w, h, r, b } = event.data;
-
-      try {
-        if (typeof OffscreenCanvas === "undefined") {
-          throw new Error("OffscreenCanvas is not available");
-        }
-
-        const canvas = new OffscreenCanvas(w, h);
-        const ctx = canvas.getContext("2d");
-        const imageData = ctx.createImageData(w, h);
-
-        fillDisplacementData(imageData.data, w, h, r, b);
-        ctx.putImageData(imageData, 0, 0);
-
-        const blob = await canvas.convertToBlob({ type: "image/png" });
-        self.postMessage({ id, cacheKey, blob });
-      } catch (error) {
-        self.postMessage({
-          id,
-          cacheKey,
-          error: error && error.message ? error.message : String(error)
-        });
-      }
-    };
-  `;
-
-  const disableWarmupWorker = () => {
-    warmupWorkerBroken = true;
-    pendingWarmups.clear();
-
-    if (warmupWorker) {
-      warmupWorker.terminate();
-      warmupWorker = null;
+  const mapFor = (width, height, radius, bezel) => {
+    const scale = Math.min(1, 256 / Math.max(width, height));
+    const w = Math.max(2, Math.round(width * scale));
+    const h = Math.max(2, Math.round(height * scale));
+    const short = Math.min(w, h) / 2;
+    const r = Math.min(Math.round(radius * scale), short);
+    const b = Math.min(Math.max(1, Math.round(bezel * scale)), short);
+    const key = `${w}x${h}r${r}b${b}`;
+    if (maps.has(key)) {
+      const url = maps.get(key);
+      maps.delete(key);
+      maps.set(key, url);
+      return url;
     }
-
-    if (warmupWorkerUrl) {
-      URL.revokeObjectURL(warmupWorkerUrl);
-      warmupWorkerUrl = "";
-    }
-  };
-
-  const getWarmupWorker = () => {
-    if (warmupWorkerBroken || warmupWorker) return warmupWorker;
-    if (
-      typeof Worker === "undefined" ||
-      typeof Blob === "undefined" ||
-      typeof URL === "undefined"
-    ) {
-      return null;
-    }
-
-    try {
-      warmupWorkerUrl = URL.createObjectURL(
-        new Blob([createWarmupWorkerSource()], { type: "text/javascript" })
-      );
-      warmupWorker = new Worker(warmupWorkerUrl, { name: "liquid-glass-map-warmup" });
-
-      warmupWorker.onmessage = (event) => {
-        const { id, cacheKey, blob, error } = event.data;
-        const pending = pendingWarmups.get(id);
-        if (!pending) return;
-        pendingWarmups.delete(id);
-
-        if (error || !blob) {
-          disableWarmupWorker();
-          return;
-        }
-
-        if (!dataUrlCache.has(cacheKey)) {
-          dataUrlCache.set(cacheKey, URL.createObjectURL(blob));
-        }
-      };
-
-      warmupWorker.onerror = () => {
-        disableWarmupWorker();
-      };
-    } catch {
-      disableWarmupWorker();
-    }
-
-    return warmupWorker;
-  };
-
-  const warmDisplacementMap = (width, height, radius, bezel) => {
-    const params = normalizeMapParams(width, height, radius, bezel);
-    if (dataUrlCache.has(params.cacheKey)) return;
-
-    for (const pending of pendingWarmups.values()) {
-      if (pending.cacheKey === params.cacheKey) return;
-    }
-
-    const worker = getWarmupWorker();
-    if (!worker) return;
-
-    try {
-      warmupWorkerSeq += 1;
-      pendingWarmups.set(warmupWorkerSeq, { cacheKey: params.cacheKey });
-      worker.postMessage({ id: warmupWorkerSeq, ...params });
-    } catch {
-      pendingWarmups.delete(warmupWorkerSeq);
-      disableWarmupWorker();
-    }
-  };
-
-  /**
-   * 生成圆角矩形的 displacement map。
-   * 返回 dataURL；同一组参数从 cache 复用。
-   *
-   * 编码：feDisplacementMap 公式 P'(x,y) = P(x + s*(R-0.5), y + s*(G-0.5))
-   *   想让"内部像素去采样更外侧"做出折射环，因此每个像素的位移向量方向 = 内法线
-   *   （从该像素指向卡片内部）。R = 128 + nx*mag*127, G = 128 + ny*mag*127。
-   */
-  const makeDisplacementMap = (width, height, radius, bezel) => {
-    const { w, h, r, b, cacheKey } = normalizeMapParams(width, height, radius, bezel);
-    const cached = dataUrlCache.get(cacheKey);
-    if (cached) return cached;
-
     const canvas = document.createElement("canvas");
     canvas.width = w;
     canvas.height = h;
     const ctx = canvas.getContext("2d");
-    const imageData = ctx.createImageData(w, h);
-
-    fillDisplacementData(imageData.data, w, h, r, b);
-    ctx.putImageData(imageData, 0, 0);
+    if (!ctx) throw new Error("Canvas unavailable");
+    const pixels = ctx.createImageData(w, h);
+    fillDisplacementData(pixels.data, w, h, r, b);
+    ctx.putImageData(pixels, 0, 0);
     const url = canvas.toDataURL();
-    dataUrlCache.set(cacheKey, url);
+    if (url === "data:,") throw new Error("Canvas encoding unavailable");
+    maps.set(key, url);
+    if (maps.size > MAX_CACHE) maps.delete(maps.keys().next().value);
     return url;
   };
 
-  const matchConfig = (el) => {
-    for (const cfg of SHAPE_CONFIG) {
-      if (el.matches(cfg.selector)) return cfg;
+  const setup = (el) => {
+    if (!near(el)) { release(el); return; }
+    // offset dimensions exclude hover transforms; use the actual density/radius.
+    const width = el.offsetWidth, height = el.offsetHeight;
+    const radius = Math.min(parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0, width / 2, height / 2);
+    const bezel = Math.min(16, width / 4, height / 3);
+    const geometry = `${width}/${height}/${radius}/${bezel}`;
+    if (entries.get(el)?.geometry === geometry) return;
+    const url = mapFor(width, height, radius, bezel);
+    if (!svg) {
+      svg = createSvg("svg", { width: 0, height: 0, "aria-hidden": "true", focusable: "false", "data-liquid-defs": "" });
+      svg.style.cssText = "position:absolute;width:0;height:0;overflow:hidden;pointer-events:none";
+      defs = createSvg("defs");
+      svg.append(defs);
+      document.body.append(svg);
     }
-    return null;
-  };
-
-  const init = () => {
-    if (!probeSupport()) {
-      document.documentElement.dataset.liquidGlassSupported = "false";
-      return;
-    }
-
-    const svg = document.createElementNS(SVG_NS, "svg");
-    svg.setAttribute("aria-hidden", "true");
-    svg.setAttribute("focusable", "false");
-    svg.setAttribute("width", "0");
-    svg.setAttribute("height", "0");
-    svg.style.cssText =
-      "position:absolute;width:0;height:0;overflow:hidden;pointer-events:none;";
-    const defs = document.createElementNS(SVG_NS, "defs");
-    svg.appendChild(defs);
-    document.body.appendChild(svg);
-
-    document.documentElement.dataset.liquidGlassSupported = "true";
-
-    const elementMap = new WeakMap();
-    let seq = 0;
-    // 提前声明：click 兜底监听器在下面会读 active；放这里避免 TDZ。
-    let active = document.body.dataset.surface === "liquid";
-    let currentHover = null;
-
-    /**
-     * 给一个元素分配 / 更新独立 filter。
-     * 元素尺寸为 0（display:none 或还没 layout）时直接跳过，等下一次再试。
-     * 仅在 surface=liquid 时才写 inline backdrop-filter；否则只更新内部缓存。
-     * 大量导航卡仅在接近视口时完整 setup，减少首屏位移图生成量。
-     */
-    const setupElement = (el, options = {}) => {
-      const cfg = matchConfig(el);
-      if (!cfg) return;
-      const force = Boolean(options.force);
-      const rect = el.getBoundingClientRect();
-      const w = Math.round(rect.width);
-      const h = Math.round(rect.height);
-      if (w < 4 || h < 4) return;
-
-      const isLiquidActive = document.body.dataset.surface === "liquid";
-      if (isLiquidActive && !force && !isEagerElement(el) && !isNearViewport(el) && !elementMap.has(el)) {
-        return;
-      }
-
-      let entry = elementMap.get(el);
-      if (entry && entry.width === w && entry.height === h) {
-        // 已经分配过且尺寸没变。如果当前是液态玻璃，确保 inline filter 还在；
-        // 如果不是，确保 inline filter 已被清空。
-        if (isLiquidActive) {
-          const chain = `url(#${entry.id}) blur(2px) saturate(150%) brightness(1.02)`;
-          if (el.style.backdropFilter !== chain) {
-            el.style.backdropFilter = chain;
-            el.style.webkitBackdropFilter = chain;
-          }
-        } else {
-          if (el.style.backdropFilter) {
-            el.style.backdropFilter = "";
-            el.style.webkitBackdropFilter = "";
-          }
-        }
-        return;
-      }
-
-      const url = makeDisplacementMap(w, h, cfg.radius, cfg.bezel);
-      // displacement scale 用逻辑 bezel（全尺寸），与 map 降采样无关
-      const baseScale = Math.min(cfg.bezel * 2.0, 36);
-      const hoverScale = baseScale * cfg.hoverBoost;
-
-      if (!entry) {
-        seq += 1;
-        const id = `lg-${seq}`;
-        const filter = document.createElementNS(SVG_NS, "filter");
-        filter.setAttribute("id", id);
-        filter.setAttribute("x", "0%");
-        filter.setAttribute("y", "0%");
-        filter.setAttribute("width", "100%");
-        filter.setAttribute("height", "100%");
-        filter.setAttribute("filterUnits", "objectBoundingBox");
-        filter.setAttribute("primitiveUnits", "userSpaceOnUse");
-        filter.setAttribute("color-interpolation-filters", "sRGB");
-
-        const feImage = document.createElementNS(SVG_NS, "feImage");
-        feImage.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href", url);
-        feImage.setAttribute("href", url);
-        feImage.setAttribute("x", "0");
-        feImage.setAttribute("y", "0");
-        feImage.setAttribute("width", String(w));
-        feImage.setAttribute("height", String(h));
-        feImage.setAttribute("result", "dispMap");
-        feImage.setAttribute("preserveAspectRatio", "none");
-
-        const feDisp = document.createElementNS(SVG_NS, "feDisplacementMap");
-        feDisp.setAttribute("in", "SourceGraphic");
-        feDisp.setAttribute("in2", "dispMap");
-        feDisp.setAttribute("scale", String(baseScale));
-        feDisp.setAttribute("xChannelSelector", "R");
-        feDisp.setAttribute("yChannelSelector", "G");
-
-        filter.appendChild(feImage);
-        filter.appendChild(feDisp);
-        defs.appendChild(filter);
-
-        const filterChain = `url(#${id}) blur(2px) saturate(150%) brightness(1.02)`;
-        // 仅在液态玻璃模式下写 inline；其他模式只准备好 filter 备用
-        if (isLiquidActive) {
-          el.style.backdropFilter = filterChain;
-          el.style.webkitBackdropFilter = filterChain;
-        }
-
-        entry = {
-          id,
-          width: w,
-          height: h,
-          feImage,
-          feDisp,
-          baseScale,
-          hoverScale,
-          currentScale: baseScale,
-          targetScale: baseScale,
-          animId: 0,
-          lastT: 0
-        };
-        elementMap.set(el, entry);
-      } else {
-        // 尺寸变了：换 dataURL，更新 feImage 大小
-        entry.width = w;
-        entry.height = h;
-        entry.baseScale = baseScale;
-        entry.hoverScale = hoverScale;
-        entry.feImage.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href", url);
-        entry.feImage.setAttribute("href", url);
-        entry.feImage.setAttribute("width", String(w));
-        entry.feImage.setAttribute("height", String(h));
-        const isHover = entry.targetScale === entry.hoverScale;
-        entry.targetScale = isHover ? hoverScale : baseScale;
-      }
-    };
-
-    const warmElement = (el) => {
-      const cfg = matchConfig(el);
-      if (!cfg || el.closest("[hidden]")) return;
-
-      const rect = el.getBoundingClientRect();
-      const w = Math.round(rect.width);
-      const h = Math.round(rect.height);
-      if (w < 4 || h < 4) return;
-
-      warmDisplacementMap(w, h, cfg.radius, cfg.bezel);
-    };
-
-    const warmupQueue = new Set();
-    let warmupFlush = 0;
-
-    const flushWarmupQueue = (deadline) => {
-      warmupFlush = 0;
-      const frameStart = performance.now();
-      const hasIdleBudget = deadline && typeof deadline.timeRemaining === "function";
-
-      while (warmupQueue.size) {
-        if (hasIdleBudget) {
-          if (deadline.timeRemaining() < 4) break;
-        } else if (performance.now() - frameStart > 4) {
-          break;
-        }
-
-        const el = warmupQueue.values().next().value;
-        warmupQueue.delete(el);
-
-        if (el.isConnected) {
-          warmElement(el);
-        }
-      }
-
-      if (warmupQueue.size) {
-        requestWarmupFlush();
-      }
-    };
-
-    const requestWarmupFlush = () => {
-      if (warmupFlush) return;
-
-      if ("requestIdleCallback" in window) {
-        warmupFlush = requestIdleCallback(flushWarmupQueue, { timeout: 1200 });
-      } else {
-        warmupFlush = requestAnimationFrame(() => flushWarmupQueue());
-      }
-    };
-
-    const scheduleWarmup = (elements) => {
-      for (const el of elements) {
-        warmupQueue.add(el);
-      }
-
-      if (warmupQueue.size) {
-        requestWarmupFlush();
-      }
-    };
-
-    // ---- 启动：常驻控件立刻 setup；导航卡按视口懒加载 ----
-    if (document.body.dataset.surface === "liquid") {
-      document.querySelectorAll(HOVER_SELECTOR).forEach((el) => {
-        if (isEagerElement(el) || isNearViewport(el)) {
-          setupElement(el, { force: isEagerElement(el) });
-        }
-      });
-    } else {
-      scheduleWarmup(document.querySelectorAll(HOVER_SELECTOR));
-    }
-
-    // 视口内卡片进入时再装 filter
-    if ("IntersectionObserver" in window) {
-      const io = new IntersectionObserver(
-        (entries) => {
-          if (!active) return;
-          for (const entry of entries) {
-            if (!entry.isIntersecting) continue;
-            setupElement(entry.target, { force: true });
-          }
-        },
-        { root: null, rootMargin: `${VIEW_MARGIN}px`, threshold: 0.01 }
-      );
-      document.querySelectorAll(".nav-item, .nav-section-title").forEach((el) => io.observe(el));
-    } else {
-      // 无 IO 时退化为滚动时补 setup
-      let scrollFlush = 0;
-      const onScroll = () => {
-        if (!active || scrollFlush) return;
-        scrollFlush = requestAnimationFrame(() => {
-          scrollFlush = 0;
-          document.querySelectorAll(".nav-item, .nav-section-title").forEach((el) => {
-            if (isNearViewport(el)) setupElement(el, { force: true });
-          });
-        });
-      };
-      window.addEventListener("scroll", onScroll, { passive: true });
-      window.addEventListener("resize", onScroll, { passive: true });
-    }
-
-    // ---- ResizeObserver：尺寸变化重新生成 ----
-    let resizeFlush = 0;
-    const pendingResize = new Set();
-    const flushResize = () => {
-      if (active) {
-        pendingResize.forEach((el) => setupElement(el, { force: true }));
-      } else {
-        scheduleWarmup(pendingResize);
-      }
-      pendingResize.clear();
-      resizeFlush = 0;
-    };
-    if ("ResizeObserver" in window) {
-      const ro = new ResizeObserver((entries) => {
-        for (const e of entries) {
-          pendingResize.add(e.target);
-        }
-        if (!resizeFlush) {
-          resizeFlush = requestAnimationFrame(flushResize);
-        }
-      });
-      document.querySelectorAll(HOVER_SELECTOR).forEach((el) => ro.observe(el));
-    }
-
-    // 默认 hidden 的浮窗（搜索引擎下拉、偏好面板）：监听 hidden 属性变化，
-    // 一变成可见立即 setup，避免"展开瞬间没玻璃"的空窗。
-    const setupElementWithRetry = (el, retriesLeft = 3) => {
-      setupElement(el, { force: true });
-      // 没拿到尺寸（display:none 残留 / layout 未完成）就 rAF 重试几次
-      if (!elementMap.has(el) && retriesLeft > 0) {
-        requestAnimationFrame(() => setupElementWithRetry(el, retriesLeft - 1));
-      }
-    };
-
-    const hiddenWatchTargets = document.querySelectorAll(".search-engine, .preference-panel");
-    if (hiddenWatchTargets.length) {
-      const hiddenMo = new MutationObserver((entries) => {
-        for (const m of entries) {
-          if (m.type === "attributes" && m.attributeName === "hidden") {
-            const el = m.target;
-            if (!el.hidden) {
-              // 浮窗刚展开。同步尝试 + rAF 兜底，并把它内部的可悬停后代一起带上。
-              if (active) {
-                setupElementWithRetry(el);
-                el.querySelectorAll(HOVER_SELECTOR).forEach((child) =>
-                  setupElementWithRetry(child)
-                );
-              } else {
-                scheduleWarmup([el]);
-                scheduleWarmup(el.querySelectorAll(HOVER_SELECTOR));
-              }
-            }
-          }
-        }
-      });
-      hiddenWatchTargets.forEach((el) =>
-        hiddenMo.observe(el, { attributes: true, attributeFilter: ["hidden"] })
-      );
-    }
-
-    // 兜底：如果偏好面板在 setup 时仍然没拿到尺寸（极少数浏览器
-    // 在 hidden->false 后第一次 getBoundingClientRect 会得到 0），
-    // 把 click 事件一并 hook，给浏览器一帧时间渲染再试。
-    document.addEventListener("click", (event) => {
-      if (!active) return;
-      const toggle = event.target.closest && event.target.closest(
-        ".preference-toggle, #search-engine-toggle"
-      );
-      if (!toggle) return;
-      // 等浏览器渲染面板后再 setup
-      requestAnimationFrame(() => {
-        document.querySelectorAll(
-          ".preference-panel:not([hidden]), .search-engine:not([hidden])"
-        ).forEach((el) => {
-          setupElementWithRetry(el);
-          el.querySelectorAll(HOVER_SELECTOR).forEach((c) =>
-            setupElementWithRetry(c)
-          );
-        });
-      });
-    }, true);
-
-    // ---- hover 反馈：交给 CSS 的 transform: scale 处理 ----
-    // Apple Liquid Glass 的 hover/press 是"gel-like" 的整体弹性形变，
-    // 不是改 displacement——displacement 保持静态最像玻璃透镜。
-    // 这里 setHovered 不再驱动 scale 动画，但保留接口给将来需要时使用。
-    const setHovered = () => {
-      // no-op：交由 CSS :hover 控制
-    };
-
-    // ---- 鼠标交互 ----
-
-    const clearHover = () => {
-      if (currentHover) {
-        setHovered(currentHover, false);
-        currentHover = null;
-      }
-    };
-
-    new MutationObserver(() => {
-      active = document.body.dataset.surface === "liquid";
-      if (!active) {
-        clearHover();
-        // 切到非液态玻璃：清除所有 inline backdrop-filter，让 CSS 接管
-        document.querySelectorAll(HOVER_SELECTOR).forEach((el) => {
-          el.style.backdropFilter = "";
-          el.style.webkitBackdropFilter = "";
-        });
-      } else {
-        // 切回液态玻璃：常驻控件 + 近视口卡片立刻装 filter
-        document.querySelectorAll(HOVER_SELECTOR).forEach((el) => {
-          const entry = elementMap.get(el);
-          if (entry) {
-            const chain = `url(#${entry.id}) blur(2px) saturate(150%) brightness(1.02)`;
-            el.style.backdropFilter = chain;
-            el.style.webkitBackdropFilter = chain;
-          } else if (isEagerElement(el) || isNearViewport(el)) {
-            setupElement(el, { force: isEagerElement(el) });
-          }
-        });
-      }
-    }).observe(document.body, {
-      attributes: true,
-      attributeFilter: ["data-surface"]
+    release(el);
+    const id = `lg-${++sequence}`;
+    const filter = createSvg("filter", {
+      id, x: "0%", y: "0%", width: "100%", height: "100%",
+      filterUnits: "objectBoundingBox", primitiveUnits: "userSpaceOnUse",
+      "color-interpolation-filters": "sRGB"
     });
-
-    document.addEventListener(
-      "pointerover",
-      (event) => {
-        if (!active) return;
-        const target = event.target.closest && event.target.closest(HOVER_SELECTOR);
-        if (!target || target === currentHover) return;
-        // 懒加载：默认 hidden 的元素（搜索引擎下拉、偏好面板）启动时尺寸为 0，
-        // 第一次 hover 时再分配 filter
-        if (!elementMap.has(target)) {
-          setupElement(target, { force: true });
-          if (!elementMap.has(target)) return; // 真还没尺寸就放弃
-        }
-        if (currentHover) setHovered(currentHover, false);
-        currentHover = target;
-        setHovered(target, true);
-      },
-      { passive: true }
-    );
-
-    document.addEventListener(
-      "pointerout",
-      (event) => {
-        if (!active || !currentHover) return;
-        if (event.relatedTarget && currentHover.contains(event.relatedTarget)) return;
-        clearHover();
-      },
-      { passive: true }
-    );
-
-    window.addEventListener("blur", clearHover, { passive: true });
-    document.addEventListener(
-      "visibilitychange",
-      () => {
-        if (document.hidden) clearHover();
-      },
-      { passive: true }
-    );
+    filter.append(createSvg("feImage", {
+      href: url, x: 0, y: 0, width, height, result: "displacement", preserveAspectRatio: "none"
+    }), createSvg("feDisplacementMap", {
+      in: "SourceGraphic", in2: "displacement", scale: bezel * 2,
+      xChannelSelector: "R", yChannelSelector: "G"
+    }));
+    defs.append(filter);
+    const chain = `url(#${id}) blur(2px) saturate(135%)`;
+    el.style.backdropFilter = chain;
+    el.style.webkitBackdropFilter = chain;
+    el.dataset.liquidReady = "true";
+    entries.set(el, { filter, geometry });
   };
-
-  if (document.body) {
-    init();
-  } else {
-    document.addEventListener("DOMContentLoaded", init, { once: true });
-  }
+  const flush = () => {
+    frame = 0;
+    if (!active()) return;
+    const start = performance.now();
+    try {
+      while (pending.size) {
+        const el = pending.values().next().value;
+        pending.delete(el);
+        setup(el);
+        // Bound per-frame work, including on large bookmark pages.
+        if (performance.now() - start >= 4) break;
+      }
+    } catch {
+      failed = true;
+      reset();
+      document.documentElement.dataset.liquidGlassSupported = "false";
+    }
+    if (pending.size && active()) frame = requestAnimationFrame(flush);
+  };
+  const enqueue = (el) => {
+    if (!active()) return;
+    pending.add(el);
+    if (!frame) frame = requestAnimationFrame(flush);
+  };
+  const refresh = () => {
+    if (!active()) { reset(); return; }
+    entries.forEach((_, el) => { if (!near(el)) release(el); });
+    document.querySelectorAll(SELECTOR).forEach(el => { if (active() && near(el)) enqueue(el); });
+  };
+  const intersection = typeof IntersectionObserver !== "undefined" ? new IntersectionObserver(changes => {
+    changes.forEach(({ target, isIntersecting }) => {
+      if (isIntersecting) enqueue(target);
+      else { pending.delete(target); release(target); }
+    });
+  }, { rootMargin: `${MARGIN}px` }) : null;
+  const resize = typeof ResizeObserver !== "undefined" ? new ResizeObserver(changes => {
+    changes.forEach(({ target }) => { if (active() && near(target)) enqueue(target); });
+  }) : null;
+  const observe = (node) => {
+    if (!(node instanceof Element)) return;
+    const elements = [...node.querySelectorAll(SELECTOR)];
+    if (node.matches(SELECTOR)) elements.push(node);
+    elements.forEach(el => { intersection?.observe(el); resize?.observe(el); if (active() && near(el)) enqueue(el); });
+  };
+  const unobserve = (node) => {
+    if (!(node instanceof Element)) return;
+    const elements = [...node.querySelectorAll(SELECTOR)];
+    if (node.matches(SELECTOR)) elements.push(node);
+    elements.forEach(el => {
+      intersection?.unobserve(el); resize?.unobserve(el); pending.delete(el); release(el);
+    });
+  };
+  new MutationObserver(changes => {
+    let needsRefresh = false;
+    changes.forEach(change => {
+      if (change.type === "attributes") needsRefresh = true;
+      else {
+        change.removedNodes.forEach(unobserve);
+        change.addedNodes.forEach(observe);
+      }
+    });
+    if (needsRefresh) refresh();
+  }).observe(document.body, { subtree: true, childList: true, attributes: true,
+    attributeFilter: ["data-surface", "data-density", "hidden", "open"] });
+  // Observer callbacks cover modern engines; this keeps the fallback functional.
+  if (!intersection) window.addEventListener("scroll", refresh, { passive: true });
+  window.addEventListener("resize", refresh, { passive: true });
+  document.addEventListener("visibilitychange", refresh);
+  window.addEventListener("pagehide", reset);
+  window.addEventListener("pageshow", refresh);
+  observe(document.body);
 })();

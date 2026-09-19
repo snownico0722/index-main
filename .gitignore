@@ -14,3 +14,7 @@ book2html/snapshots/
 
 # Unused local background copy.
 images/beijin1g.jpg
+
+# Development-only UI regression dependencies and output.
+node_modules/
+test-results/

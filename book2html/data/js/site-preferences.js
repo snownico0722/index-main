@@ -910,22 +910,28 @@
     const textBrightnessAmount = Math.abs(textBrightness);
     const useTextBrightness = preferences.textContrast === "off" && textBrightness !== 0;
 
-    document.body.dataset.theme = preferences.theme;
-    document.body.dataset.surface = preferences.surface;
-    document.body.dataset.density = preferences.density;
-    document.body.dataset.themeBackgroundPriority = preferences.themeBackgroundPriority;
-    document.body.dataset.backgroundBlur = preferences.backgroundBlur > 0 ? "custom" : "off";
-    document.body.dataset.cardBrightness = "custom";
-    document.body.dataset.cardOpacity = "custom";
-    document.body.dataset.cardRenderer = nativeCardRendererSurfaces.has(preferences.surface) ? "native" : "generic";
-    document.body.dataset.cardOpacityDirection = cardOpacity > 0 ? "stacked" : cardOpacity < 0 ? "transparent" : "off";
-    document.body.dataset.cardOpacityLevel = cardOpacity <= -100 ? "transparent" : cardOpacity === 0 ? "off" : "custom";
-    document.body.dataset.textContrast = preferences.textContrast;
-    document.body.dataset.textContrastMethod = preferences.textContrastMethod;
-    document.body.dataset.textColorMode = preferences.textColorMode;
-    document.body.dataset.textBrightness = useTextBrightness ? "custom" : "off";
-    document.body.dataset.textShadow = preferences.textShadow;
-    document.body.dataset.textBold = preferences.textBold;
+    // Do not retrigger material/background observers while dragging unrelated sliders.
+    const attributes = {
+      theme: preferences.theme,
+      surface: preferences.surface,
+      density: preferences.density,
+      themeBackgroundPriority: preferences.themeBackgroundPriority,
+      backgroundBlur: preferences.backgroundBlur > 0 ? "custom" : "off",
+      cardBrightness: "custom",
+      cardOpacity: "custom",
+      cardRenderer: nativeCardRendererSurfaces.has(preferences.surface) ? "native" : "generic",
+      cardOpacityDirection: cardOpacity > 0 ? "stacked" : cardOpacity < 0 ? "transparent" : "off",
+      cardOpacityLevel: cardOpacity <= -100 ? "transparent" : cardOpacity === 0 ? "off" : "custom",
+      textContrast: preferences.textContrast,
+      textContrastMethod: preferences.textContrastMethod,
+      textColorMode: preferences.textColorMode,
+      textBrightness: useTextBrightness ? "custom" : "off",
+      textShadow: preferences.textShadow,
+      textBold: preferences.textBold
+    };
+    for (const [key, value] of Object.entries(attributes)) {
+      if (document.body.dataset[key] !== String(value)) document.body.dataset[key] = value;
+    }
     document.body.style.setProperty("--site-background-blur", `${formatBackgroundBlur(preferences.backgroundBlur)}px`);
     document.body.style.setProperty("--site-background-scale", String(1 + Math.min(preferences.backgroundBlur * 0.0045, 0.08)));
 
@@ -1256,7 +1262,16 @@
     if (group === "textBrightness") {
       input.dataset.textColorDependent = "true";
     }
-    input.addEventListener("input", () => setPreference(group, input.value, root));
+    let inputFrame = 0;
+    const commitRange = () => {
+      window.cancelAnimationFrame(inputFrame);
+      inputFrame = 0;
+      setPreference(group, input.value, root);
+    };
+    input.addEventListener("input", () => {
+      if (!inputFrame) inputFrame = window.requestAnimationFrame(commitRange);
+    });
+    input.addEventListener("change", commitRange);
 
     titleRow.append(title, actions);
     wrapper.append(titleRow, input);
@@ -1281,7 +1296,7 @@
       content.append(createPreferenceGroup(group, root));
     });
 
-    summary.append(indicator);
+    summary.append(document.createTextNode("高级设置"), indicator);
     details.append(summary, content);
     return details;
   };
@@ -1314,6 +1329,13 @@
       button.dataset.preferenceGroup = group;
       button.dataset.preferenceOption = option.value;
       button.textContent = option.label;
+      if (group === "surface") {
+        const preview = document.createElement("span");
+        preview.className = "surface-preview";
+        preview.dataset.surfacePreview = option.value;
+        preview.setAttribute("aria-hidden", "true");
+        button.prepend(preview);
+      }
       button.addEventListener("click", () => setPreference(group, option.value, root));
       control.append(button);
     });
@@ -1420,10 +1442,17 @@
       }
 
       const toggleRect = toggle.getBoundingClientRect();
-      const panelRect = panel.getBoundingClientRect();
       const margin = 12;
-      const left = Math.max(margin, Math.min(window.innerWidth - panelRect.width - margin, toggleRect.right - panelRect.width));
-      const top = Math.max(margin, Math.min(window.innerHeight - panelRect.height - margin, toggleRect.bottom + 5));
+      const viewport = window.visualViewport;
+      const viewportLeft = viewport?.offsetLeft || 0;
+      const viewportTop = viewport?.offsetTop || 0;
+      const viewportWidth = viewport?.width || window.innerWidth;
+      const viewportHeight = viewport?.height || window.innerHeight;
+      panel.style.maxHeight = `${Math.max(0, viewportHeight - margin * 2)}px`;
+      panel.style.maxWidth = `${Math.max(0, viewportWidth - margin * 2)}px`;
+      const size = panel.getBoundingClientRect();
+      const left = Math.max(viewportLeft + margin, Math.min(viewportLeft + viewportWidth - size.width - margin, toggleRect.right - size.width));
+      const top = Math.max(viewportTop + margin, Math.min(viewportTop + viewportHeight - size.height - margin, toggleRect.bottom + 8));
 
       panel.style.left = `${left}px`;
       panel.style.top = `${top}px`;
@@ -1435,7 +1464,8 @@
       backdrop.style.height = `${rect.height}px`;
     };
 
-    const setPanelOpen = (isOpen) => {
+    const setPanelOpen = (isOpen, restoreFocus = false) => {
+      if (isOpen === !panel.hidden) return;
       panel.hidden = !isOpen;
       backdrop.hidden = !isOpen;
       root.classList.toggle("is-open", isOpen);
@@ -1445,8 +1475,10 @@
       if (isOpen) {
         syncPanelPosition();
         window.requestAnimationFrame(syncPanelPosition);
+        panel.querySelector(".preference-close").focus({ preventScroll: true });
       } else {
         syncPanelPosition();
+        if (restoreFocus) toggle.focus({ preventScroll: true });
       }
     };
 
@@ -1456,6 +1488,7 @@
     toggle.setAttribute("aria-label", "外观偏好");
     toggle.setAttribute("aria-expanded", "false");
     toggle.setAttribute("aria-controls", panelId);
+    toggle.setAttribute("aria-haspopup", "dialog");
     toggle.append(...createSettingsIcon());
 
     backdrop.className = "preference-backdrop";
@@ -1464,6 +1497,21 @@
     panel.className = "preference-panel";
     panel.id = panelId;
     panel.hidden = true;
+    panel.setAttribute("role", "dialog");
+    panel.setAttribute("aria-labelledby", "preference-title");
+    const heading = document.createElement("div");
+    heading.className = "preference-heading";
+    const title = document.createElement("h2");
+    title.id = "preference-title";
+    title.textContent = "外观偏好";
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "preference-close";
+    close.setAttribute("aria-label", "关闭外观偏好");
+    close.textContent = "×";
+    close.addEventListener("click", () => setPanelOpen(false, true));
+    heading.append(title, close);
+    panel.append(heading);
 
     preferenceGroups.forEach((group) => {
       panel.append(createPreferenceGroup(group, panel));
@@ -1488,17 +1536,22 @@
     });
 
     document.addEventListener("keydown", (event) => {
-      if (event.key !== "Escape") {
-        return;
-      }
-
-      setPanelOpen(false);
-      toggle.focus();
+      if (event.key !== "Escape" || panel.hidden || event.isComposing) return;
+      event.preventDefault();
+      setPanelOpen(false, true);
     });
 
     window.addEventListener("resize", () => {
       if (!panel.hidden) {
         syncPanelPosition();
+      }
+    });
+    const onViewportChange = () => { if (!panel.hidden) syncPanelPosition(); };
+    window.visualViewport?.addEventListener("resize", onViewportChange);
+    window.visualViewport?.addEventListener("scroll", onViewportChange);
+    panel.addEventListener("focusout", (event) => {
+      if (event.relatedTarget && !panel.contains(event.relatedTarget) && !root.contains(event.relatedTarget)) {
+        setPanelOpen(false);
       }
     });
 

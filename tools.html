@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
@@ -23,34 +23,6 @@
   </main>
 
   <script src="js/site-shell.js"></script>
-  <script data-book2html-nav>
-    (() => {
-      const pages = [{ href: "bookmarks_对话实例.html", label: "对话实例" }];
-      const list = document.querySelector(".header-menu ul");
-      if (!list) return;
-
-      const currentFile = decodeURIComponent((location.pathname.split("/").pop() || "index.html"));
-      const existingHrefs = new Set([...list.querySelectorAll("a")].map((link) => link.getAttribute("href")));
-
-      pages.forEach((page) => {
-        if (!page.href || !page.label || existingHrefs.has(page.href)) return;
-
-        const item = document.createElement("li");
-        const link = document.createElement("a");
-
-        if (page.href === currentFile) {
-          item.className = "current-menu-item";
-          link.setAttribute("aria-current", "page");
-        }
-
-        link.href = page.href;
-        link.textContent = page.label;
-        item.append(link);
-        list.append(item);
-        existingHrefs.add(page.href);
-      });
-    })();
-  </script>
 
   <script src="js/site-preferences.js"></script>
   <script src="js/site-data.js"></script>
@@ -59,9 +31,3 @@
   <script src="js/background-loader.js"></script>
 </body>
 </html>
-
-
-
-
-
-
