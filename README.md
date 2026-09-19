@@ -190,3 +190,23 @@ Details: [book2html/README.md](book2html/README.md).
 - Main project: https://github.com/snownico0722/index-main
 - Book2HTML: https://github.com/snownico0722/Bookmarks-to-html
 
+
+## 开发验证 / Development checks
+
+页面本身仍不需要安装依赖。下面只用于开发回归：
+
+```sh
+npm install --no-save --package-lock=false playwright@1.55.1
+npx playwright install chromium firefox webkit
+pwsh -File tests/bookmark-regression.ps1
+python -m http.server 8080 --bind 127.0.0.1
+# 在另一个终端 / In another terminal:
+node tests/ui-regression.cjs
+```
+
+测试覆盖九种质感、浅深色、窄屏面板边界、搜索键盘与中文输入、偏好保存/损坏/禁用、
+本地文件打开、液态玻璃资源释放及独立书签页；截图和结果在 `test-results/`。
+CI 在 Chromium、Firefox 和 WebKit 中运行。Firefox/WebKit 使用 CSS 液态玻璃降级效果。
+无图形驱动性能基准：这些检查不代表 Windows 实机帧率或 Safari 真机验收。
+
+纸纹素材 / Paper texture: transparenttextures.com, Atle Mo, CC BY-SA 3.0.

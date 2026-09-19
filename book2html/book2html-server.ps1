@@ -610,8 +610,11 @@ function Get-BookmarkIcon {
     [bool]$UseRemoteFavicons
   )
 
-  if ($UseRemoteFavicons) {
-    return "https://www.google.com/s2/favicons?sz=64&domain_url=$([Uri]::EscapeDataString($Url))"
+  $parsedUrl = $null
+  if ($UseRemoteFavicons -and [Uri]::TryCreate($Url, [UriKind]::Absolute, [ref]$parsedUrl) -and
+      $parsedUrl.Scheme -in @("http", "https") -and $parsedUrl.DnsSafeHost) {
+    # Never disclose bookmark paths, queries, fragments or embedded credentials.
+    return "https://www.google.com/s2/favicons?sz=64&domain=$([Uri]::EscapeDataString($parsedUrl.DnsSafeHost))"
   }
 
   return "$($script:ResourcePrefix)images/favicon.ico"

@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
@@ -12,12 +12,6 @@
   <link rel="stylesheet" href="css/ops-coffee.css" type="text/css">
   <link rel="shortcut icon" href="images/favicon.ico">
   <link rel="preload" as="image" href="images/beijing.jpg">
-  <link rel="dns-prefetch" href="//www.baidu.com">
-  <link rel="preconnect" href="https://www.baidu.com" crossorigin>
-  <link rel="dns-prefetch" href="//www.google.com">
-  <link rel="preconnect" href="https://www.google.com" crossorigin>
-  <link rel="dns-prefetch" href="//www.bilibili.com">
-  <link rel="preconnect" href="https://www.bilibili.com" crossorigin>
 </head>
 <body class="site-page" data-page="home">
   <div class="header" data-site-header></div>
@@ -43,9 +37,10 @@
               class="search-input"
               placeholder="输入关键词搜索"
               autocomplete="off"
+              enterkeyhint="search"
             >
             <button class="search-btn" id="search-btn" type="button" aria-label="搜索">
-              <img src="images/sou0.png" alt="">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
             </button>
           </div>
           <div class="search-engine" id="search-engine-panel" hidden>
@@ -59,34 +54,6 @@
   </main>
 
   <script src="js/site-shell.js"></script>
-  <script data-book2html-nav>
-    (() => {
-      const pages = [{ href: "bookmarks_对话实例.html", label: "对话实例" }];
-      const list = document.querySelector(".header-menu ul");
-      if (!list) return;
-
-      const currentFile = decodeURIComponent((location.pathname.split("/").pop() || "index.html"));
-      const existingHrefs = new Set([...list.querySelectorAll("a")].map((link) => link.getAttribute("href")));
-
-      pages.forEach((page) => {
-        if (!page.href || !page.label || existingHrefs.has(page.href)) return;
-
-        const item = document.createElement("li");
-        const link = document.createElement("a");
-
-        if (page.href === currentFile) {
-          item.className = "current-menu-item";
-          link.setAttribute("aria-current", "page");
-        }
-
-        link.href = page.href;
-        link.textContent = page.label;
-        item.append(link);
-        list.append(item);
-        existingHrefs.add(page.href);
-      });
-    })();
-  </script>
 
   <script src="js/site-preferences.js"></script>
   <script src="js/site-data.js"></script>
@@ -96,9 +63,3 @@
   <script src="js/background-loader.js"></script>
 </body>
 </html>
-
-
-
-
-
-

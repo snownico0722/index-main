@@ -21,6 +21,7 @@
 
     link.className = "nav-item clearfix";
     link.href = item.url;
+    link.title = item.description ? `${item.name} — ${item.description}` : item.name;
     link.target = "_blank";
     link.rel = "noopener noreferrer";
     link.setAttribute("aria-label", item.description ? `${item.name}：${item.description}` : item.name);
@@ -30,6 +31,9 @@
     }
 
     icon.className = "nav-img";
+    icon.addEventListener("error", () => {
+      icon.src = "images/favicon.ico";
+    }, { once: true });
     icon.src = item.icon;
     icon.alt = "";
     icon.loading = "lazy";
