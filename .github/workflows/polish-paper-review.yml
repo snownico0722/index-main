@@ -1,0 +1,45 @@
+name: Apply paper grain review
+on:
+  push:
+    branches: [improve/visual-interaction-skins-20260920]
+    paths: [.github/workflows/polish-paper-review.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: github.repository == 'snownico0722/index-main' && github.ref == 'refs/heads/improve/visual-interaction-skins-20260920'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply exact reviewed CSS change to both distributions
+        shell: python
+        run: |
+          from pathlib import Path
+          import hashlib
+          p = Path('css/ops-coffee.css')
+          assert hashlib.sha256(p.read_bytes()).hexdigest() == 'feb2527f9935ff0f018e674c984d63d2797752377784c440396f6c30d4f8fbd6'
+          old = '''body.site-page[data-surface="paper"] .segmented-control {
+            background-image: var(--surface-texture);
+          }
+          '''
+          new = old + '''/* Blend the grain with the paper tint rather than washing dark paper gray. */
+          body.site-page[data-surface="paper"] :is(.nav-section-title, .search-box, .preference-panel, .segmented-control),
+          body.site-page[data-surface="paper"] :is(.nav-item, .nav-section-title, .bookmark-empty, .search-engine, .bookmark-info-panel)::before {
+            background-blend-mode: soft-light;
+          }
+          '''
+          text = p.read_text()
+          assert text.count(old) == 1
+          data = text.replace(old, new).encode()
+          assert hashlib.sha256(data).hexdigest() == '9f7983fab96a6272755d5c33f12b911ca0e6b9dd47c16e745fb52199f74a18e9'
+          p.write_bytes(data)
+          Path('book2html/data/css/ops-coffee.css').write_bytes(data)
+      - name: Commit only to the review branch
+        run: |
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add css/ops-coffee.css book2html/data/css/ops-coffee.css
+          git commit -m 'fix: blend paper grain with its tint to preserve dark-theme readability'
+          git push origin HEAD:improve/visual-interaction-skins-20260920
